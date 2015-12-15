@@ -1,0 +1,5 @@
+SQLALCHEMY_DATABASE_URI='sqlite:///kraken.db'
+DEBUG=True
+SECRET_KEY='development'
+LOG_LEVEL=logging.DEBUG
+ENVIRONMENT='development
