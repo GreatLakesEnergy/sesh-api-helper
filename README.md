@@ -22,5 +22,6 @@ You can optionally set the path to a config file in a FLASK_SETTINGS environment
 Have a look at the config.cfg.example file
 
     export FLASK_SETTINGS=/path/to/config.cfg
-    export PORT=5000
+    export FLASK_PORT=5000
+    export FLASK_HOST=0.0.0.0
     python api.py
