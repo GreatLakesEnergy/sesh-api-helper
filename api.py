@@ -59,6 +59,8 @@ def post():
     args.pop('apikey')
 
     data = MultiDict(json.loads(request.args.get('data')))
+    if request.args.get('time', None):
+        data['time'] = request.args.get('time')
     insert_data(map_input_to_columns(data))
 
     return "OK"
