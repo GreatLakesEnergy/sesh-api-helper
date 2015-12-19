@@ -20,8 +20,7 @@ app.config.update(dict(
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
     APIKEY=None,
-    MAPPING=dict(),
-    BULK_INDEX_MAPPING={1: 'battery_voltage'}
+    MAPPING=dict()
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
