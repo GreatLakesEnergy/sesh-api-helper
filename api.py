@@ -3,10 +3,13 @@ import logging
 import requests
 import flask
 import datetime
+import json
+import sqlalchemy
 
-
-from flask import Flask, request, flash, redirect, render_template, url_for, jsonify
+from datetime import datetime, date, time
+from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.datastructures import MultiDict
 
 app = Flask(__name__)
 app.config.update(dict(
@@ -14,60 +17,85 @@ app.config.update(dict(
     DEBUG=True,
     SECRET_KEY='development',
     LOG_LEVEL=logging.DEBUG,
-    ENVIRONMENT='development'
+    ENVIRONMENT='development',
+    TABLE_NAME='seshdash_bom_data_point',
+    APIKEY=None,
+    MAPPING=dict(),
+    BULK_INDEX_MAPPING={1: 'battery_voltage'}
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
-logging.basicConfig(level=logging.DEBUG, filename='logs/' + app.config['ENVIRONMENT'] + '.log')
+logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
 db = SQLAlchemy(app)
-
-# TODO: reused model from sesh-dash! DRY!!! - at least move database stuff it into a separate file
-class Sesh_Site(db.Model):
-    __tablename__= 'sites'
-    id = db.Column(db.Integer, primary_key=True)
-    site_name = db.Column(db.String(100))
-
-    def __str__(self):
-        return self.site_name
-
-class BoM_Data_Point(db.Model):
-    __tablename__= 'data_points'
-    id = db.Column(db.Integer(), primary_key=True)
-    site_id = db.Column(db.Integer(), db.ForeignKey('sites.id'))
-    site = db.relationship('Sesh_Site')
-    time = db.Column(db.DateTime())
-    soc = db.Column(db.Float())
-    battery_voltage = db.Column(db.Float())
-    AC_input = db.Column(db.Float())
-    AC_output = db.Column(db.Float())
-    AC_Load_in = db.Column(db.Float())
-    AC_Load_out = db.Column(db.Float())
-    pv_production = db.Column(db.Float(), default=0)
-    inverter_state = db.Column(db.String(100))
-    genset_state = db.Column(db.String(100))
-    relay_state = db.Column(db.String(100))
-    trans = db.Column(db.Integer(), default=0)
-
-    def __str__(self):
-        return " %s : %s : %s" %(self.time,self.site,self.soc)
-
-
-db.create_all()
-
+table = sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=db.engine), autoload=True)
 
 @app.route("/ping")
 def ping():
     logging.debug("pong")
     return "pong"
 
-@app.route("/input/post.json", methods=['POST', 'GET'])
-def post():
-    return jsonify({'hello': 'world'})
+@app.before_request
+def validate_api_key():
+    if not request.args.get('apikey', None) == app.config['APIKEY']:
+        abort(403)
 
-@app.route('/input/bulk', methods=['POST', 'GET'])
+
+# simple endpoint that accepts data as get parameters
+@app.route("/input/insert", methods=['GET'])
+def insert():
+    args = request.args.copy()
+    args.pop('apikey') # todo: DRY
+    insert_data(map_input_to_columns(args))
+    return "OK"
+
+# accepts an EMON post data command
+# data is send as json in a get parameter called "data"
+@app.route("/input/post.json", methods=['GET'])
+def post():
+    if not request.args.get('data', None):
+        return ""
+    args = request.args.copy()
+    args.pop('apikey')
+
+    data = MultiDict(json.loads(request.args.get('data')))
+    insert_data(map_input_to_columns(data))
+
+    return "OK"
+
+# accepts an EMON post bulk data command
+# time must be a unix timestamp whereas for the other endpoints we require a UTC string. the reason for this is here we need to calculate with time whereas in the other endpoints we only hand it over to the database (which does not accept a unix timestamp)
+@app.route('/input/bulk', methods=['GET'])
 def bulk():
+    if not request.args.get('data', None):
+        return ""
+    data = json.loads(request.args.get('data'))
+
+    for index in app.config["BULK_INDEX_MAPPING"]:
+        entry = data[index]
+        column = app.config["BULK_INDEX_MAPPING"][index]
+
+    for entry in data:
+        print entry
+
     return "bulk"
+
+
+def map_input_to_columns(args):
+    fields = dict()
+    for key in args:
+        if app.config['MAPPING'].get(key, None):
+            fields[app.config['MAPPING'].get(key)] = args[key]
+        else:
+            fields[key] = args[key]
+
+    return fields
+
+def insert_data(data):
+    logging.debug('new input: %s' %(str(data)))
+    sql = table.insert().values(data)
+    db.engine.execute(sql)
+
 
 
 if __name__ == "__main__":
