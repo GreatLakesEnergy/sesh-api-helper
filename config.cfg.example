@@ -1,7 +1,8 @@
 SQLALCHEMY_DATABASE_URI='sqlite:///kraken.db'
 DEBUG=True
 SECRET_KEY='development'
-LOG_LEVEL='logging.DEBUG'
+ROLLBAR_TOKEN='token'
+LOG_LEVEL='DEBUG'
 ENVIRONMENT='development
 TABLE_NAME='seshdash_bom_data_point',
 APIKEY=None,
