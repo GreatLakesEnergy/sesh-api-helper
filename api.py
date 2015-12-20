@@ -20,7 +20,7 @@ app.config.update(dict(
     DEBUG=True,
     SECRET_KEY='development',
     ROLLBAR_TOKEN=None,
-    LOG_LEVEL=logging.DEBUG,
+    LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
     APIKEY=None,
@@ -114,7 +114,7 @@ def map_input_to_columns(args):
 def insert_data(data):
     logging.debug('new input: %s' %(str(data)))
     sql = table.insert().values(data)
-    db.engine.execute(sql)
+    db.engine.execute(sql).close()
 
 
 
