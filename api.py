@@ -103,7 +103,7 @@ def bulk():
 
         insert_data(inserts)
 
-    return "bulk"
+    return "OK"
 
 
 def map_input_to_columns(args):
