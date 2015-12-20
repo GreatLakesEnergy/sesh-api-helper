@@ -5,17 +5,21 @@ import flask
 import datetime
 import json
 import sqlalchemy
+import rollbar
+import rollbar.contrib.flask
 
 from datetime import datetime, date, time
-from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify
+from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.datastructures import MultiDict
+
 
 app = Flask(__name__)
 app.config.update(dict(
     SQLALCHEMY_DATABASE_URI='sqlite:///kraken.db',
     DEBUG=True,
     SECRET_KEY='development',
+    ROLLBAR_TOKEN=None,
     LOG_LEVEL=logging.DEBUG,
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
@@ -29,15 +33,30 @@ logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None
 db = SQLAlchemy(app)
 table = sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=db.engine), autoload=True)
 
-@app.route("/ping")
-def ping():
-    logging.debug("pong")
-    return "pong"
+@app.before_first_request
+def init_rollbar():
+    if app.config['ROLLBAR_TOKEN']:
+        rollbar.init(
+            app.config['ROLLBAR_TOKEN'],
+            app.config['ENVIRONMENT'],
+            # server root directory, makes tracebacks prettier
+            root=os.path.dirname(os.path.realpath(__file__)),
+            # flask already sets up logging
+            allow_logging_basic_config=False)
+
+        # send exceptions from `app` to rollbar, using flask's signal system.
+        got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
 
 @app.before_request
 def validate_api_key():
     if not request.args.get('apikey', None) == app.config['APIKEY']:
         abort(403)
+
+
+@app.route("/ping")
+def ping():
+    logging.debug("pong")
+    return "pong"
 
 
 # simple endpoint that accepts data as get parameters
