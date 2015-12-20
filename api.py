@@ -98,7 +98,7 @@ def bulk():
         inserts['time'] = start_time + timedelta(seconds=row[0])
         inserts['site_id'] = row[1]
         for index in app.config["BULK_INDEX_MAPPING"]:
-            if len(row) >= index+1:
+            if len(row) >= index+1: # make sure we have an entry for that index. just in case
                 inserts[app.config['BULK_INDEX_MAPPING'][index]] = row[index]
 
         insert_data(inserts)
