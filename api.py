@@ -8,7 +8,7 @@ import sqlalchemy
 import rollbar
 import rollbar.contrib.flask
 
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.datastructures import MultiDict
@@ -24,7 +24,8 @@ app.config.update(dict(
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
     APIKEY=None,
-    MAPPING=dict()
+    MAPPING=dict(),
+    BULK_INDEX_MAPPING = dict()
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
@@ -85,20 +86,24 @@ def post():
 
 # accepts an EMON post bulk data command
 # time must be a unix timestamp whereas for the other endpoints we require a UTC string. the reason for this is here we need to calculate with time whereas in the other endpoints we only hand it over to the database (which does not accept a unix timestamp)
-@app.route('/input/bulk', methods=['GET'])
+@app.route('/input/bulk.json', methods=['GET'])
 def bulk():
     if not request.args.get('data', None):
         return ""
     data = json.loads(request.args.get('data'))
 
-    for index in app.config["BULK_INDEX_MAPPING"]:
-        entry = data[index]
-        column = app.config["BULK_INDEX_MAPPING"][index]
+    start_time = datetime.fromtimestamp(int(request.args.get('time')))
+    for row in data:
+        inserts = dict()
+        inserts['time'] = start_time + timedelta(seconds=row[0])
+        inserts['site_id'] = row[1]
+        for index in app.config["BULK_INDEX_MAPPING"]:
+            if len(row) >= index+1: # make sure we have an entry for that index. just in case
+                inserts[app.config['BULK_INDEX_MAPPING'][index]] = row[index]
 
-    for entry in data:
-        print entry
+        insert_data(inserts)
 
-    return "bulk"
+    return "OK"
 
 
 def map_input_to_columns(args):
