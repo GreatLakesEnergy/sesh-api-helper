@@ -63,7 +63,7 @@ def ping():
 @app.route("/input/insert", methods=['GET'])
 def insert():
     args = request.args.copy()
-    args.pop('apikey') # todo: DRY
+    if args.has_key('apikey'): args.pop('apikey') # todo: DRY
     insert_data(map_input_to_columns(args))
     return "OK"
 
@@ -74,7 +74,7 @@ def post():
     if not request.args.get('data', None):
         return ""
     args = request.args.copy()
-    args.pop('apikey')
+    if args.has_key('apikey'): args.pop('apikey') # todo: DRY
 
     data = MultiDict(json.loads(request.args.get('data')))
     if request.args.get('time', None):

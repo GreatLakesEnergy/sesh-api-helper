@@ -24,10 +24,30 @@ class ApiTestCase(unittest.TestCase):
             assert 403 == r.status_code
 
     def test_insert(self):
-        # pending
-        assert 1 == 1
-        #self.app.get('/input/insert?bv=123&time=2015-12-15T07:36:25Z')
-        #assert self.get_last_entry()['battery_voltage'] == 123.0
+        api.app.config['MAPPING'] = dict(pwr='power')
+        r = self.app.get('/input/insert?battery_voltage=123&pwr=POWER&time=2015-12-15T07:36:25Z')
+        assert 200 == r.status_code
+        assert self.get_last_entry()['battery_voltage'] == 123.0
+        assert self.get_last_entry()['power'] == 'POWER'
+
+    def test_post(self):
+        api.app.config['MAPPING'] = dict(pwr='power')
+        r = self.app.get('/input/post.json?data={"battery_voltage":123,"pwr": "POWER","time": "2015-12-15T07:36:25Z"}')
+        assert 200 == r.status_code
+        assert self.get_last_entry()['battery_voltage'] == 123.0
+        assert self.get_last_entry()['power'] == 'POWER'
+
+    def test_bulk(self):
+        api.app.config['BULK_INDEX_MAPPING'] = {0:'power', 1:'battery_voltage'}
+        r = self.app.get('/input/bulk?data=[[0,16,1137],[2,17,1437,3164]]&time=1231231421')
+        assert 200 == r.status_code
+        rows = api.db.engine.execute(api.table.select().order_by(sqlalchemy.desc('id'))).fetchall()
+        assert row[0]['power'] == 1137
+        assert row[0]['battery_voltage'] == None
+        assert row[1]['power'] == 1437
+        assert row[1]['battery_voltage'] == 3164
+        #TODO: test timestamp
+
 
     def test_ping(self):
         response = self.app.get('/ping')
