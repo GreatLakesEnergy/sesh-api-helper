@@ -5,8 +5,30 @@ import api
 import tempfile
 import sqlalchemy
 
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, DateTime
+
 
 class ApiTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        api.app.config['TESTING'] = True
+        api.app.config['TABLE_NAME'] = 'test_table'
+
+        engine = create_engine('sqlite://', echo=True)
+        metadata = MetaData()
+
+        user = Table(api.app.config['TABLE_NAME'], metadata,
+            Column('id', Integer, primary_key=True),
+            Column('site_id', Integer),
+            Column('battery_voltage', Integer),
+            Column('power', String(16)),
+            Column('time', String()) # ToDo: do real test for time
+            #Column('time', DateTime())
+        )
+
+        metadata.create_all(engine)
+        api.app.engine = engine
 
     def setUp(self):
         api.app.config['TESTING'] = True
@@ -14,7 +36,7 @@ class ApiTestCase(unittest.TestCase):
         self.app = api.app.test_client()
 
     def tearDown(self):
-        api.table.delete()
+        api.get_table().delete()
 
 
     def test_apikey_required(self):
@@ -38,14 +60,16 @@ class ApiTestCase(unittest.TestCase):
         assert self.get_last_entry()['power'] == 'POWER'
 
     def test_bulk(self):
-        api.app.config['BULK_INDEX_MAPPING'] = {0:'power', 1:'battery_voltage'}
-        r = self.app.get('/input/bulk?data=[[0,16,1137],[2,17,1437,3164]]&time=1231231421')
+        api.app.config['BULK_INDEX_MAPPING'] = {2:'power', 3:'battery_voltage'}
+        r = self.app.get('/input/bulk.json?data=[[0,16,1137],[2,17,1437,3164]]&time=1231231421')
         assert 200 == r.status_code
-        rows = api.db.engine.execute(api.table.select().order_by(sqlalchemy.desc('id'))).fetchall()
-        assert row[0]['power'] == 1137
-        assert row[0]['battery_voltage'] == None
-        assert row[1]['power'] == 1437
-        assert row[1]['battery_voltage'] == 3164
+        rows = api.app.engine.execute(api.get_table().select().order_by(sqlalchemy.desc('id'))).fetchall()
+        assert rows[0]['power'] == unicode(1437)
+        assert rows[0]['site_id'] == 17
+        assert rows[0]['battery_voltage'] == 3164
+        assert rows[1]['site_id'] == 16
+        assert rows[1]['power'] == unicode(1137)
+        assert rows[1]['battery_voltage'] == None
         #TODO: test timestamp
 
 
@@ -54,7 +78,7 @@ class ApiTestCase(unittest.TestCase):
         assert 'pong' in response.data
 
     def get_last_entry(self):
-        return api.db.engine.execute(api.table.select().order_by(sqlalchemy.desc('id')).limit(1)).fetchone()
+        return api.app.engine.execute(api.get_table().select().order_by(sqlalchemy.desc('id')).limit(1)).fetchone()
 
 
 if __name__ == '__main__':

@@ -31,8 +31,9 @@ app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
-db = SQLAlchemy(app)
-table = sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=db.engine), autoload=True)
+
+def get_table():
+    return sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
 
 @app.before_first_request
 def init_rollbar():
@@ -118,8 +119,9 @@ def map_input_to_columns(args):
 
 def insert_data(data):
     logging.debug('new input: %s' %(str(data)))
+    table = get_table()
     sql = table.insert().values(data)
-    db.engine.execute(sql).close()
+    app.engine.execute(sql).close()
 
 
 
@@ -127,5 +129,6 @@ if __name__ == "__main__":
     port = int(os.environ.get('FLASK_PORT', 5000))
     # Use 0.0.0.0 to make server visable externally
     host = os.environ.get('FLASK_HOST', '')
+    app.engine = SQLAlchemy(app).engine
     app.run(host=host,port=port)
 
