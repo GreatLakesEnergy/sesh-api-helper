@@ -15,7 +15,7 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TESTING'] = True
         api.app.config['TABLE_NAME'] = 'test_table'
 
-        engine = create_engine('sqlite://', echo=True)
+        engine = create_engine('sqlite://', echo=False) # set echo=True for debugging
         metadata = MetaData()
 
         user = Table(api.app.config['TABLE_NAME'], metadata,
