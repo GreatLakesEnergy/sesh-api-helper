@@ -20,7 +20,7 @@ app.config.update(dict(
     DEBUG=True,
     SECRET_KEY='development',
     ROLLBAR_TOKEN=None,
-    LOG_LEVEL=logging.DEBUG,
+    LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
     APIKEY=None,
@@ -31,8 +31,9 @@ app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
-db = SQLAlchemy(app)
-table = sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=db.engine), autoload=True)
+
+def get_table():
+    return sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
 
 @app.before_first_request
 def init_rollbar():
@@ -64,7 +65,7 @@ def ping():
 @app.route("/input/insert", methods=['GET'])
 def insert():
     args = request.args.copy()
-    args.pop('apikey') # todo: DRY
+    if args.has_key('apikey'): args.pop('apikey') # todo: DRY
     insert_data(map_input_to_columns(args))
     return "OK"
 
@@ -75,7 +76,7 @@ def post():
     if not request.args.get('data', None):
         return ""
     args = request.args.copy()
-    args.pop('apikey')
+    if args.has_key('apikey'): args.pop('apikey') # todo: DRY
 
     data = MultiDict(json.loads(request.args.get('data')))
     if request.args.get('time', None):
@@ -118,8 +119,9 @@ def map_input_to_columns(args):
 
 def insert_data(data):
     logging.debug('new input: %s' %(str(data)))
+    table = get_table()
     sql = table.insert().values(data)
-    db.engine.execute(sql)
+    app.engine.execute(sql).close()
 
 
 
@@ -127,5 +129,6 @@ if __name__ == "__main__":
     port = int(os.environ.get('FLASK_PORT', 5000))
     # Use 0.0.0.0 to make server visable externally
     host = os.environ.get('FLASK_HOST', '')
+    app.engine = SQLAlchemy(app).engine
     app.run(host=host,port=port)
 
