@@ -91,17 +91,22 @@ def post():
 def bulk():
     if not request.args.get('data', None):
         return ""
+    if not request.args.get('site_id', None):
+        return ""
+
     data = json.loads(request.args.get('data'))
+    site_id =  json.loads(request.args.get('site_id'))
 
     start_time = datetime.fromtimestamp(int(request.args.get('time')))
     for row in data:
         inserts = dict()
-        inserts['time'] = start_time + timedelta(seconds=row[0])
-        inserts['site_id'] = row[1]
+        #inserts['time'] = start_time + timedelta(seconds=row[0])
+        inserts['time'] = datetime.fromtimestamp(int(row[0]))
+        inserts['site_id'] = site_id #adding distinction between
         for index in app.config["BULK_INDEX_MAPPING"]:
             if len(row) >= index+1: # make sure we have an entry for that index. just in case
                 inserts[app.config['BULK_INDEX_MAPPING'][index]] = row[index]
-
+        logging.info("inserting %s"%inserts)
         insert_data(inserts)
 
     return "OK"
