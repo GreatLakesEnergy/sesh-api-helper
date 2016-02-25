@@ -3,15 +3,18 @@ import logging
 import requests
 import flask
 import datetime
+import time
 import json
 import sqlalchemy
 import rollbar
 import rollbar.contrib.flask
 
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, timedelta
+from dateutil.parser import parser as date_parser
 from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.datastructures import MultiDict
+from influxdb import client as influxClient
 
 
 app = Flask(__name__)
@@ -25,11 +28,20 @@ app.config.update(dict(
     TABLE_NAME='seshdash_bom_data_point',
     APIKEY=None,
     MAPPING=dict(),
-    BULK_INDEX_MAPPING = dict()
+    BULK_INDEX_MAPPING = dict(),
+    INFLUXDB_HOST='localhost',
+    INFLUXDB_PORT=8086,
+    INFLUXDB_USER=None,
+    INFLUXDB_PASSWORD=None,
+    INFLUXDB_DATABASE='kraken'
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
+
+
+if(app.config['INFLUXDB_HOST'] != None):
+    influx = influxClient.InfluxDBClient(app.config['INFLUXDB_HOST'], app.config['INFLUXDB_PORT'], app.config['INFLUXDB_USER'], app.config['INFLUXDB_PASSWORD'], app.config['INFLUXDB_DATABASE'])
 
 
 def get_table():
@@ -119,9 +131,43 @@ def map_input_to_columns(args):
 
 def insert_data(data):
     logging.debug('new input: %s' %(str(data)))
+    insert_mysql(data.copy())
+    if(app.config['INFLUXDB_HOST'] != None):
+        insert_influx(data.copy())
+
+def insert_mysql(data):
     table = get_table()
     sql = table.insert().values(data)
+    logging.debug('writing to mysql: %s' %(str(sql)))
     app.engine.execute(sql).close()
+
+def insert_influx(data):
+    points = []
+    if data.has_key('time'):
+        t = data.pop('time')
+        if(type(t) != datetime):
+            t = date_parser().parse(t.decode('utf-8'))
+    else:
+        t = datetime.now()
+    timestamp = int(time.mktime(t.timetuple()))
+
+    tags = {}
+    if data.has_key('site_id'):
+        tags["site_id"] = int(data.pop('site_id'))
+
+    for key in data:
+        point = {
+            "measurement": key,
+            "time": timestamp,
+            "tags": tags,
+            "fields": {
+                "value": float(data[key])
+            }
+        }
+        points.append(point)
+    logging.debug('writing influx points: %s' %(str(points)))
+    influx.write_points(points)
+
 
 
 
