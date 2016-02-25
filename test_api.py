@@ -64,7 +64,8 @@ class ApiTestCase(unittest.TestCase):
         r = self.app.get('/input/bulk.json?data=[[0,16,1137],[2,17,1437,3164]]&time=1231231421')
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table().select().order_by(sqlalchemy.desc('id'))).fetchall()
-        assert rows[0]['power'] == unicode(1437)
+        print rows
+        assert rows[0]['power'] == 1437
         assert rows[0]['site_id'] == 17
         assert rows[0]['battery_voltage'] == 3164
         assert rows[1]['site_id'] == 16
