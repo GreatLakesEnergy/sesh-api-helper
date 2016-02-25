@@ -86,6 +86,7 @@ class ApiTestCase(unittest.TestCase):
         voltage = list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))
         assert voltage[0]['value'], 3164
         assert len(voltage), 1
+        assert api.date_parser().parse(voltage[0]['time'].decode('utf-8')).year == 2009
         #TODO: test timestamp
 
 
