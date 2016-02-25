@@ -36,7 +36,8 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TESTING'] = True
         api.app.config['APIKEY'] = None
         self.app = api.app.test_client()
-        api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
+        if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
+            api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
         api.influx.create_database(api.app.config['INFLUXDB_DATABASE'])
 
     def tearDown(self):
