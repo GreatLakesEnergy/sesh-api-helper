@@ -149,7 +149,7 @@ def insert_influx(data):
             t = date_parser().parse(t.decode('utf-8'))
     else:
         t = datetime.now()
-    timestamp = int(time.mktime(t.timetuple()))
+    timestamp = t.isoformat()
 
     tags = {}
     if data.has_key('site_id'):
