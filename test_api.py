@@ -72,8 +72,8 @@ class ApiTestCase(unittest.TestCase):
     def test_bulk(self):
         api.app.config['APIKEY'] = 'testing'
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
-        r = self.app.post('/input/bulk.json?time=1231231421&site_id=1&apikey='+ api.app.config.get('APIKEY'),
-                data=dict(data='[[121234123,9,16,1137],[2341234,11,17,1437]]'))
+        r = self.app.post('/input/bulk.json?site_id=1&apikey='+ api.app.config.get('APIKEY'),
+                data=dict(data='[[121234123,9,16,1137],[2341234,11,17,1437]]',time=12312415))
         print r
 
         assert 200 == r.status_code

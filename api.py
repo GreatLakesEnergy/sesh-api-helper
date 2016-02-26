@@ -103,7 +103,7 @@ def bulk():
         return ""
 
     site_id =  json.loads(request.args.get('site_id'))
-    start_time = datetime.fromtimestamp(int(request.args.get('time')))
+    start_time = datetime.fromtimestamp(int(request.form['time']))
     for row in data:
         inserts = dict()
         inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
