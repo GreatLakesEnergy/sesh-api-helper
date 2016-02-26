@@ -84,8 +84,8 @@ class ApiTestCase(unittest.TestCase):
         print rows2
         assert rows[0][2] == 1137
         assert rows[0][3] == 16
-        assert rows2[1][2] == 1437
-        assert rows2[1][3] == 17
+        assert rows2[0][2] == 1437
+        assert rows2[0][3] == 17
         #TODO: test timestamp
 
 
