@@ -79,7 +79,9 @@ class ApiTestCase(unittest.TestCase):
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
-
+        print rows
+        print "##########"
+        print rows2
         assert rows[0][2] == 1137
         assert rows[0][3] == 16
         assert rows2[1][2] == 1437
