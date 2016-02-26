@@ -15,7 +15,6 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TESTING'] = True
         api.app.config['TABLE_NAME'] = 'test_table'
         api.app.config['TABLE_NAME2'] = 'test_table2'
-        api.app.config['BULK_NODE_TABLE_MAPPING'] = {9: api.app.config['TABLE_NAME'] , 11: api.app.config['TABLE_NAME2']}
 
         engine = create_engine('sqlite:///kraken.db', echo=False) # set echo=True for debugging
         metadata = MetaData()
@@ -25,7 +24,7 @@ class ApiTestCase(unittest.TestCase):
             Column('site_id', Integer),
             Column('battery_voltage', Integer),
             Column('power', Integer),
-            Column('time', String()) # ToDo: do real test for time
+            Column('timestamp', String()) # ToDo: do real test for time
             #Column('time', DateTime())
         )
 
@@ -34,7 +33,7 @@ class ApiTestCase(unittest.TestCase):
             Column('site_id', Integer),
             Column('battery_voltage', Integer),
             Column('power', Integer),
-            Column('time', String()) # ToDo: do real test for time
+            Column('timestamp', String()) # ToDo: do real test for time
             #Column('time', DateTime())
         )
 
@@ -58,23 +57,24 @@ class ApiTestCase(unittest.TestCase):
 
     def test_insert(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/insert?battery_voltage=123&pwr=500&time=2015-12-15T07:36:25Z')
+        r = self.app.get('/input/insert?battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert self.get_last_entry()['power'] == 500
 
     def test_post(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/post.json?data={"battery_voltage":123, "pwr":400 ,"time": "2015-12-15T07:36:25Z"}')
+        r = self.app.get('/input/post.json?data={"battery_voltage":123, "pwr":400 ,"timestamp": "2015-12-15T07:36:25Z"}')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert self.get_last_entry()['power'] == 400
 
     def test_bulk(self):
         api.app.config['APIKEY'] = 'testing'
-        api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage'},11:{2:'power', 3:'battery_voltage'}}
-        r = self.app.get('/input/bulk.json?data=[[121234123,9,16,1137],[2341234,11,17,1437]]'+
-        '&time=1231231421&site_id=1&apikey='+ api.app.config.get('APIKEY'))
+        api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
+        r = self.app.post('/input/bulk.json?time=1231231421&site_id=1&apikey='+ api.app.config.get('APIKEY'),
+                data=dict(data='[[121234123,9,16,1137],[2341234,11,17,1437]]'))
+        print r
 
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()

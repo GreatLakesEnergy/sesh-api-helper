@@ -26,7 +26,6 @@ app.config.update(dict(
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
-    BULK_NODE_TABLE_MAPPING = dict()
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
@@ -83,8 +82,8 @@ def post():
     if args.has_key('apikey'): args.pop('apikey') # todo: DRY
 
     data = MultiDict(json.loads(request.args.get('data')))
-    if request.args.get('time', None):
-        data['time'] = request.args.get('time')
+    if request.args.get('timestamp', None):
+        data['timestamp'] = request.args.get('time')
     insert_data(map_input_to_columns(data))
 
     return "OK"
@@ -94,6 +93,8 @@ def post():
 @app.route('/input/bulk.json', methods=['GET','POST'])
 def bulk():
     data = request.form['data']
+    data = json.loads(data)
+
     if not data:
         logging.debug("No data recieved dropping")
         return ""
@@ -101,10 +102,8 @@ def bulk():
         logging.debug("No site_id  recieved dropping")
         return ""
 
-    data = json.loads(data)
     site_id =  json.loads(request.args.get('site_id'))
-    start_time = datetime.fromtimestamp(int(request.form['time']))
-
+    start_time = datetime.fromtimestamp(int(request.args.get('time')))
     for row in data:
         inserts = dict()
         inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
@@ -121,17 +120,11 @@ def bulk():
             return "NO"
 
         for index in app.config["BULK_INDEX_MAPPING"][node_id]:
-            if len(row) >= index+1: # Make sure we have an entry for that index. just in case
+            if isinstance(index,int) and len(row) >= index+1: # Make sure we have an entry for that index. just in case
                 inserts[app.config['BULK_INDEX_MAPPING'][node_id][index]] = row[index]
 
-        # Find out which table the data needs to goto
-        if app.config['BULK_NODE_TABLE_MAPPING']:
-            if app.config['BULK_NODE_TABLE_MAPPING'].has_key(node_id):
-                table = app.config['BULK_NODE_TABLE_MAPPING'][node_id]
-            else:
-                logging.warning("No table mapping found for nodeid=%s dropping"%node_id)
-                return ""
-
+            # Find out which table the data needs to goto
+            table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
         logging.info("inserting %s"%inserts)
 
         # We need to send the data to the correct table according to the type of data it is
