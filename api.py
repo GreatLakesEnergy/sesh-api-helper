@@ -28,7 +28,7 @@ app.config.update(dict(
     BULK_INDEX_MAPPING = dict(),
     BULK_NODE_TABLE_MAPPING = dict()
 ))
-app.config.from_envvar('FLASK_SETTINGS', silent=False)
+app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
 if app.config['DEBUG']:
