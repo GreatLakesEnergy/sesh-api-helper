@@ -29,22 +29,25 @@ app.config.update(dict(
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
-    INFLUXDB_HOST='localhost',
+    INFLUXDB_HOST='http://sesh-dev1.cloudapp.net',
     INFLUXDB_PORT=8086,
-    INFLUXDB_USER=None,
-    INFLUXDB_PASSWORD=None,
+    INFLUXDB_USER='root',
+    INFLUXDB_PASSWORD='gle12345',
     INFLUXDB_DATABASE='kraken'
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
-
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
+if app.config['DEBUG']:
+    logging.debug("config: " +str(app.config))
 
 if(app.config['INFLUXDB_HOST'] != None):
     influx = influxClient.InfluxDBClient(app.config['INFLUXDB_HOST'], app.config['INFLUXDB_PORT'], app.config['INFLUXDB_USER'], app.config['INFLUXDB_PASSWORD'], app.config['INFLUXDB_DATABASE'])
 
 
-def get_table():
+def get_table(table_name=None):
+    if table_name:
+        return sqlalchemy.schema.Table(table_name, sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
     return sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
 
 @app.before_first_request
@@ -91,35 +94,53 @@ def post():
     if args.has_key('apikey'): args.pop('apikey') # todo: DRY
 
     data = MultiDict(json.loads(request.args.get('data')))
-    if request.args.get('time', None):
-        data['time'] = request.args.get('time')
+    if request.args.get('timestamp', None):
+        data['timestamp'] = request.args.get('time')
     insert_data(map_input_to_columns(data))
 
     return "OK"
 
 # accepts an EMON post bulk data command
 # time must be a unix timestamp whereas for the other endpoints we require a UTC string. the reason for this is here we need to calculate with time whereas in the other endpoints we only hand it over to the database (which does not accept a unix timestamp)
-@app.route('/input/bulk.json', methods=['GET'])
+@app.route('/input/bulk.json', methods=['GET','POST'])
 def bulk():
-    if not request.args.get('data', None):
+    data = request.form['data']
+    data = json.loads(data)
+
+    if not data:
+        logging.debug("No data recieved dropping")
         return ""
     if not request.args.get('site_id', None):
+        logging.debug("No site_id  recieved dropping")
         return ""
 
-    data = json.loads(request.args.get('data'))
     site_id =  json.loads(request.args.get('site_id'))
-
-    start_time = datetime.fromtimestamp(int(request.args.get('time')))
+    start_time = datetime.fromtimestamp(int(request.form['time']))
     for row in data:
         inserts = dict()
-        #inserts['time'] = start_time + timedelta(seconds=row[0])
-        inserts['time'] = datetime.fromtimestamp(int(row[0]))
-        inserts['site_id'] = site_id #adding distinction between
-        for index in app.config["BULK_INDEX_MAPPING"]:
-            if len(row) >= index+1: # make sure we have an entry for that index. just in case
-                inserts[app.config['BULK_INDEX_MAPPING'][index]] = row[index]
+        inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
+        inserts['site_id'] = site_id # Adding distinction between sites
+        logging.debug("got post in get "+str(inserts))
+        node_id = int(row[1]) # Adding distinction between nodes
+        table = None
+
+        if not app.config['BULK_INDEX_MAPPING'].has_key(node_id):
+            logging.warning("No table mapping found for in BULK_INDEX_MAPPING nodeid=%s dropping"%node_id)
+
+            logging.warning(str( app.config['BULK_INDEX_MAPPING'].keys()))
+            logging.warning(str( app.config['BULK_INDEX_MAPPING']))
+            return "NO"
+
+        for index in app.config["BULK_INDEX_MAPPING"][node_id]:
+            if isinstance(index,int) and len(row) >= index+1: # Make sure we have an entry for that index. just in case
+                inserts[app.config['BULK_INDEX_MAPPING'][node_id][index]] = row[index]
+
+            # Find out which table the data needs to goto
+            table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
         logging.info("inserting %s"%inserts)
-        insert_data(inserts)
+
+        # We need to send the data to the correct table according to the type of data it is
+        insert_data(inserts,table)
 
     return "OK"
 
@@ -134,14 +155,21 @@ def map_input_to_columns(args):
 
     return fields
 
-def insert_data(data):
+def insert_data(data,table=None):
+    if table:
+        table = get_table(table_name = table)
+    else:
+        table = get_table()
     logging.debug('new input: %s' %(str(data)))
     insert_mysql(data.copy())
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 
 def insert_mysql(data):
-    table = get_table()
+    if table:
+        table = get_table(table_name = table)
+    else:
+        table = get_table()
     sql = table.insert().values(data)
     logging.debug('writing to mysql: %s' %(str(sql)))
     app.engine.execute(sql).close()
