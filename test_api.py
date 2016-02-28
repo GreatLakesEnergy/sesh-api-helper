@@ -5,7 +5,8 @@ import api
 import tempfile
 import sqlalchemy
 
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, DateTime
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, DateTime
+from influxdb import client as influxClient
 
 
 class ApiTestCase(unittest.TestCase):
@@ -40,10 +41,14 @@ class ApiTestCase(unittest.TestCase):
         metadata.create_all(engine)
         api.app.engine = engine
 
+
     def setUp(self):
         api.app.config['TESTING'] = True
         api.app.config['APIKEY'] = None
         self.app = api.app.test_client()
+        if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
+            api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
+        api.influx.create_database(api.app.config['INFLUXDB_DATABASE'])
 
     def tearDown(self):
         api.get_table().delete()
@@ -60,6 +65,9 @@ class ApiTestCase(unittest.TestCase):
         r = self.app.get('/input/insert?battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
+        assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'], 123.0
+        assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'], float('78.9')
+
         assert self.get_last_entry()['power'] == 500
 
     def test_post(self):
@@ -68,6 +76,9 @@ class ApiTestCase(unittest.TestCase):
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert self.get_last_entry()['power'] == 400
+        assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'], 123.0
+        assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'], float('78.9')
+
 
     def test_bulk(self):
         api.app.config['APIKEY'] = 'testing'
@@ -86,6 +97,14 @@ class ApiTestCase(unittest.TestCase):
         assert rows[0][3] == 16
         assert rows2[0][2] == 1437
         assert rows2[0][3] == 17
+
+        power = list(api.influx.query('select value from power').get_points(measurement='power'))
+        assert power[0]['value'], 1437
+        assert power[1]['value'], 1137.42
+        assert len(power), 2
+        voltage = list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))
+        assert voltage[0]['value'], 3164
+        assert len(voltage), 1
         #TODO: test timestamp
 
 
