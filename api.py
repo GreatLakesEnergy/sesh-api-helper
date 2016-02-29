@@ -137,7 +137,7 @@ def bulk():
 
             # Find out which table the data needs to goto
             table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
-        logging.info("inserting %s"%inserts)
+        logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
         insert_data(inserts,table)
@@ -156,16 +156,12 @@ def map_input_to_columns(args):
     return fields
 
 def insert_data(data,table=None):
-    if table:
-        table = get_table(table_name = table)
-    else:
-        table = get_table()
     logging.debug('new input: %s' %(str(data)))
-    insert_mysql(data.copy())
+    insert_mysql(data.copy(),table)
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 
-def insert_mysql(data):
+def insert_mysql(data,table=None):
     if table:
         table = get_table(table_name = table)
     else:
@@ -176,8 +172,8 @@ def insert_mysql(data):
 
 def insert_influx(data):
     points = []
-    if data.has_key('time'):
-        t = data.pop('time')
+    if data.has_key('timestamp'):
+        t = data.pop('timestamp')
         if(type(t) != datetime):
             t = date_parser().parse(t.decode('utf-8'))
     else:
@@ -187,7 +183,7 @@ def insert_influx(data):
     tags = {}
     if data.has_key('site_id'):
         tags["site_id"] = int(data.pop('site_id'))
-
+    logging.debug("Prepping data for influx %s"%str(data))
     for key in data:
         point = {
             "measurement": key,
