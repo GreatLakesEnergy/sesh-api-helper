@@ -29,10 +29,10 @@ app.config.update(dict(
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
-    INFLUXDB_HOST='http://sesh-dev1.cloudapp.net',
+    INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
-    INFLUXDB_USER='root',
-    INFLUXDB_PASSWORD='gle12345',
+    INFLUXDB_USER='',
+    INFLUXDB_PASSWORD='',
     INFLUXDB_DATABASE='kraken'
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
@@ -60,6 +60,7 @@ def init_rollbar():
             root=os.path.dirname(os.path.realpath(__file__)),
             # flask already sets up logging
             allow_logging_basic_config=False)
+        logging.debu("Rollbar intiated")
 
         # send exceptions from `app` to rollbar, using flask's signal system.
         got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
@@ -94,7 +95,7 @@ def post():
     if args.has_key('apikey'): args.pop('apikey') # todo: DRY
 
     data = MultiDict(json.loads(request.args.get('data')))
-    if request.args.get('timestamp', None):
+    if request.args.get('time', None):
         data['timestamp'] = request.args.get('time')
     insert_data(map_input_to_columns(data))
 
@@ -137,7 +138,7 @@ def bulk():
 
             # Find out which table the data needs to goto
             table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
-        logging.info("inserting %s"%inserts)
+        logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
         insert_data(inserts,table)
@@ -156,16 +157,12 @@ def map_input_to_columns(args):
     return fields
 
 def insert_data(data,table=None):
-    if table:
-        table = get_table(table_name = table)
-    else:
-        table = get_table()
     logging.debug('new input: %s' %(str(data)))
-    insert_mysql(data.copy())
+    insert_mysql(data.copy(),table)
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 
-def insert_mysql(data):
+def insert_mysql(data,table=None):
     if table:
         table = get_table(table_name = table)
     else:
@@ -176,8 +173,8 @@ def insert_mysql(data):
 
 def insert_influx(data):
     points = []
-    if data.has_key('time'):
-        t = data.pop('time')
+    if data.has_key('timestamp'):
+        t = data.pop('timestamp')
         if(type(t) != datetime):
             t = date_parser().parse(t.decode('utf-8'))
     else:
@@ -187,7 +184,7 @@ def insert_influx(data):
     tags = {}
     if data.has_key('site_id'):
         tags["site_id"] = int(data.pop('site_id'))
-
+    logging.debug("Prepping data for influx %s"%str(data))
     for key in data:
         point = {
             "measurement": key,
