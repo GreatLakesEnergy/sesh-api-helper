@@ -29,10 +29,10 @@ app.config.update(dict(
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
-    INFLUXDB_HOST='http://sesh-dev1.cloudapp.net',
+    INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
-    INFLUXDB_USER='root',
-    INFLUXDB_PASSWORD='gle12345',
+    INFLUXDB_USER='',
+    INFLUXDB_PASSWORD='',
     INFLUXDB_DATABASE='kraken'
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
@@ -60,6 +60,7 @@ def init_rollbar():
             root=os.path.dirname(os.path.realpath(__file__)),
             # flask already sets up logging
             allow_logging_basic_config=False)
+        logging.debu("Rollbar intiated")
 
         # send exceptions from `app` to rollbar, using flask's signal system.
         got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
@@ -94,7 +95,7 @@ def post():
     if args.has_key('apikey'): args.pop('apikey') # todo: DRY
 
     data = MultiDict(json.loads(request.args.get('data')))
-    if request.args.get('timestamp', None):
+    if request.args.get('time', None):
         data['timestamp'] = request.args.get('time')
     insert_data(map_input_to_columns(data))
 
