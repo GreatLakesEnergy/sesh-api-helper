@@ -29,6 +29,18 @@ Have a look at the config.cfg.example file
     python api.py
 
 
+## Tests
+
+Integration tests are defined in test_api.py
+
+To run the tests locally run: 
+    
+    python test_api.py
+
+We use [Travis CI for continous integration](https://travis-ci.org/GreatLakesEnergy/sesh-api-helper). 
+
+
+
 ## Known issues:
 
 * InfluxDB values must be type casted before inserting. (MySQL does that for us depending on the schema) Currently we are not felxible enough and simply try to convert anything to integers
