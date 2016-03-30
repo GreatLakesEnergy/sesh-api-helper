@@ -26,6 +26,7 @@ app.config.update(dict(
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
+    STATUS_TABLE_NAME='RMC_Status',
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
@@ -67,8 +68,10 @@ def init_rollbar():
 
 @app.before_request
 def validate_api_key():
-    if not request.args.get('apikey', None) == app.config['APIKEY']:
-        abort(403)
+    apikey = request.args.get('apikey', None)
+
+    if not apikey == app.config['APIKEY']:
+        abort(403) # default http status 403 if API key is invalid
 
 
 @app.route("/ping")
@@ -81,7 +84,7 @@ def ping():
 @app.route("/input/insert", methods=['GET'])
 def insert():
     args = request.args.copy()
-    if args.has_key('apikey'): args.pop('apikey') # todo: DRY
+    if args.has_key('apikey'): args.pop('apikey')
     insert_data(map_input_to_columns(args))
     return "OK"
 
@@ -92,7 +95,7 @@ def post():
     if not request.args.get('data', None):
         return ""
     args = request.args.copy()
-    if args.has_key('apikey'): args.pop('apikey') # todo: DRY
+    if args.has_key('apikey'): args.pop('apikey')
 
     data = MultiDict(json.loads(request.args.get('data')))
     if request.args.get('time', None):
@@ -142,6 +145,13 @@ def bulk():
 
         # We need to send the data to the correct table according to the type of data it is
         insert_data(inserts,table)
+
+    return "OK"
+
+@app.route('/status', methods=['GET', 'POST'])
+def status():
+    data = json.loads(request.data)
+    insert_mysql(data, app.config['STATUS_TABLE_NAME'])
 
     return "OK"
 
