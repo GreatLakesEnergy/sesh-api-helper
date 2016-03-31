@@ -4,6 +4,7 @@ import os
 import api
 import tempfile
 import sqlalchemy
+import zlib
 
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, DateTime
 from influxdb import client as influxClient
@@ -85,14 +86,10 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
         r = self.app.post('/input/bulk.json?site_id=1&apikey='+ api.app.config.get('APIKEY'),
                 data=dict(data='[[121234123,9,16,1137],[2341234,11,17,1437]]',time=12312415))
-        print r
 
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
-        print rows
-        print "##########"
-        print rows2
         assert rows[0][2] == 1137
         assert rows[0][3] == 16
         assert rows2[0][2] == 1437
@@ -103,7 +100,6 @@ class ApiTestCase(unittest.TestCase):
         assert power[1]['value'], 1137.42
         assert len(power), 2
         voltage = list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))
-        print power,voltage
         assert voltage[0]['value'], 3164
         assert len(voltage), 1
         assert api.date_parser().parse(voltage[0]['time'].decode('utf-8')).year == 1970
