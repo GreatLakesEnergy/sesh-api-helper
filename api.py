@@ -11,7 +11,7 @@ import rollbar.contrib.flask
 
 from datetime import datetime, date, timedelta
 from dateutil.parser import parser as date_parser
-from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception
+from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception, g
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.datastructures import MultiDict
 from influxdb import client as influxClient
@@ -42,6 +42,10 @@ logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None
 if app.config['DEBUG']:
     logging.debug("config: " +str(app.config))
 
+if 'APIKEY' in app.config:
+    print 'Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database'
+    logging.warn('Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database')
+
 if(app.config['INFLUXDB_HOST'] != None):
     influx = influxClient.InfluxDBClient(app.config['INFLUXDB_HOST'], app.config['INFLUXDB_PORT'], app.config['INFLUXDB_USER'], app.config['INFLUXDB_PASSWORD'], app.config['INFLUXDB_DATABASE'])
 
@@ -66,12 +70,18 @@ def init_rollbar():
         # send exceptions from `app` to rollbar, using flask's signal system.
         got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
 
+
 @app.before_request
 def validate_api_key():
     apikey = request.args.get('apikey', None)
 
-    if not apikey == app.config['APIKEY']:
-        abort(403) # default http status 403 if API key is invalid
+    sql = get_table('Sesh_RMC_Account').select().where(sqlalchemy.text('API_KEY = :k')).limit(1)
+    result = app.engine.execute(sql, k=apikey)
+    g.account = result.fetchone()
+    result.close()
+    if apikey == None or app.config['APIKEY'] != apikey:
+        if g.account == None:
+            abort(403)
 
 
 @app.route("/ping")
@@ -151,6 +161,8 @@ def bulk():
 @app.route('/status', methods=['GET', 'POST'])
 def status():
     data = json.loads(request.data)
+    data['last_contact'] = datetime.now()
+    data['rmc'] = g.account['id']
     insert_mysql(data, app.config['STATUS_TABLE_NAME'])
 
     return "OK"
