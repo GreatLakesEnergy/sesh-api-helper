@@ -73,7 +73,7 @@ def init_rollbar():
 
 @app.before_request
 def validate_api_key():
-    apikey = request.args.get('apikey', None)
+    apikey = request.args.get('apikey', request.headers.get('X-Api-Key', None)) # get the API key from a request param or a header
 
     sql = get_table('Sesh_RMC_Account').select().where(sqlalchemy.text('API_KEY = :k')).limit(1)
     result = app.engine.execute(sql, k=apikey)

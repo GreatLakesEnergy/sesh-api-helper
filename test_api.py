@@ -74,6 +74,12 @@ class ApiTestCase(unittest.TestCase):
             r = self.app.get(route)
             assert 403 == r.status_code
 
+    def test_apikey_as_header(self):
+        assert 200 == self.app.get('/ping', headers={'X-API-KEY': 'YAYTESTS'}).status_code
+
+    def test_apikey_as_query_param(self):
+        assert 200 == self.app.get('/ping?apikey=YAYTESTS').status_code
+
     def test_insert(self):
         api.app.config['MAPPING'] = dict(pwr='power')
         r = self.app.get('/input/insert?apikey=YAYTESTS&battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
