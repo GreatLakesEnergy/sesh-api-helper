@@ -27,7 +27,7 @@ app.config.update(dict(
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
-    APIKEY='gle12345',
+    APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     INFLUXDB_HOST='localhost',
