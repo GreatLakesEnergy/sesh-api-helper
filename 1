@@ -76,8 +76,9 @@ def validate_api_key():
 def decompress_data():
     # Check if compressesed
     if request.headers.get('Content-Encoding', None) == 'gzip':
-        request.data = zlib.decompress(request.get_data())
-        logging.debug("decompressed %s "%request.data)
+        dc_data = zlib.decompress(request.get_data())
+        logging.debug("decompressed %s "%dc_data)
+        request.data = dc_data
 
 @app.route("/ping")
 def ping():
@@ -114,7 +115,7 @@ def post():
 @app.route('/input/bulk.json', methods=['GET','POST'])
 def bulk():
 
-    data = request.data
+    data = request.get_data()
     logging.debug("data:%s"%data)
     data = json.loads(data)
 
