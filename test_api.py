@@ -129,8 +129,7 @@ class ApiTestCase(unittest.TestCase):
         headers = {'Content-Encoding': 'gzip'}
         api.app.config['APIKEY'] = 'testing'
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
-        r = self.app.post('/input/bulk.json?site_id=1&apikey='+ api.app.config.get('APIKEY')+
-                '&time=112312415',data=data_compressed, headers=headers)
+        r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data=data_compressed, headers=headers)
 
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
