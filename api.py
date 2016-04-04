@@ -8,6 +8,7 @@ import json
 import sqlalchemy
 import rollbar
 import rollbar.contrib.flask
+import zlib
 
 from datetime import datetime, date, timedelta
 from dateutil.parser import parser as date_parser
@@ -83,6 +84,12 @@ def validate_api_key():
         if g.account == None:
             abort(403)
 
+@app.before_request
+def decompress_data():
+    # Check if compressesed
+    if request.headers.get('Content-Encoding', None) == 'gzip':
+        request.data = zlib.decompress(request.get_data())
+        logging.debug("decompressed %s "%request.data)
 
 @app.route("/ping")
 def ping():
@@ -118,19 +125,23 @@ def post():
 # time must be a unix timestamp whereas for the other endpoints we require a UTC string. the reason for this is here we need to calculate with time whereas in the other endpoints we only hand it over to the database (which does not accept a unix timestamp)
 @app.route('/input/bulk.json', methods=['GET','POST'])
 def bulk():
-    data = request.form['data']
+
+    data = request.data
+    logging.debug("data:%s"%data)
     data = json.loads(data)
 
     if not data:
         logging.debug("No data recieved dropping")
         return ""
+
     if not request.args.get('site_id', None):
         logging.debug("No site_id  recieved dropping")
         return ""
 
     site_id =  json.loads(request.args.get('site_id'))
-    start_time = datetime.fromtimestamp(int(request.form['time']))
+    start_time = datetime.fromtimestamp(int(request.args.get('time')))
     for row in data:
+
         inserts = dict()
         inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
         inserts['site_id'] = site_id # Adding distinction between sites
