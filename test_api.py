@@ -5,6 +5,7 @@ import api
 import tempfile
 import sqlalchemy
 import zlib
+import json
 
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, DateTime
 from influxdb import client as influxClient
@@ -17,11 +18,12 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TESTING'] = True
         api.app.config['TABLE_NAME'] = 'test_table'
         api.app.config['TABLE_NAME2'] = 'test_table2'
+        api.app.config['STATUS_TABLE_NAME'] = 'status_table'
 
-        engine = create_engine('sqlite:///kraken.db', echo=False) # set echo=True for debugging
+        engine = create_engine('sqlite:///', echo=False) # set echo=True for debugging
         metadata = MetaData()
 
-        user = Table(api.app.config['TABLE_NAME'], metadata,
+        Table(api.app.config['TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
             Column('site_id', Integer),
             Column('battery_voltage', Integer),
@@ -30,7 +32,7 @@ class ApiTestCase(unittest.TestCase):
             #Column('time', DateTime())
         )
 
-        user = Table(api.app.config['TABLE_NAME2'], metadata,
+        Table(api.app.config['TABLE_NAME2'], metadata,
             Column('id', Integer, primary_key=True),
             Column('site_id', Integer),
             Column('battery_voltage', Integer),
@@ -38,6 +40,19 @@ class ApiTestCase(unittest.TestCase):
             Column('timestamp', String()) # ToDo: do real test for time
             #Column('time', DateTime())
         )
+
+        Table(api.app.config['STATUS_TABLE_NAME'], metadata,
+            Column('id', Integer, primary_key=True),
+            Column('rmc', Integer),
+            Column('last_contact', DateTime),
+            Column('signal_strength', Integer)
+        )
+
+        Table('Sesh_RMC_Account', metadata,
+            Column('id', Integer, primary_key=True),
+            Column('API_KEY', String),
+        )
+
 
         metadata.create_all(engine)
         api.app.engine = engine
@@ -45,7 +60,7 @@ class ApiTestCase(unittest.TestCase):
 
     def setUp(self):
         api.app.config['TESTING'] = True
-        api.app.config['APIKEY'] = None
+        api.app.engine.execute("insert into Sesh_RMC_Account (API_KEY) values ('YAYTESTS')")
         self.app = api.app.test_client()
         if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
             api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
@@ -56,14 +71,19 @@ class ApiTestCase(unittest.TestCase):
 
 
     def test_apikey_required(self):
-        api.app.config['APIKEY'] = 'sunnysunday'
-        for route in ['/ping', '/input/insert', '/input/post.json', '/input/bulk']:
+        for route in ['/ping', '/input/insert', '/input/post.json', '/input/bulk', '/status']:
             r = self.app.get(route)
             assert 403 == r.status_code
 
+    def test_apikey_as_header(self):
+        assert 200 == self.app.get('/ping', headers={'X-API-KEY': 'YAYTESTS'}).status_code
+
+    def test_apikey_as_query_param(self):
+        assert 200 == self.app.get('/ping?apikey=YAYTESTS').status_code
+
     def test_insert(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/insert?battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
+        r = self.app.get('/input/insert?apikey=YAYTESTS&battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'], 123.0
@@ -73,7 +93,7 @@ class ApiTestCase(unittest.TestCase):
 
     def test_post(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/post.json?data={"battery_voltage":123, "pwr":400 ,"timestamp": "2015-12-15T07:36:25Z"}')
+        r = self.app.get('/input/post.json?apikey=YAYTESTS&data={"battery_voltage":123, "pwr":400 ,"timestamp": "2015-12-15T07:36:25Z"}')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert self.get_last_entry()['power'] == 400
@@ -82,7 +102,6 @@ class ApiTestCase(unittest.TestCase):
 
 
     def test_bulk(self):
-        api.app.config['APIKEY'] = 'testing'
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
         r = self.app.post('/input/bulk.json?site_id=1&apikey='+ api.app.config.get('APIKEY')+
                 '&time=112312415',data='[[121234123,9,16,1137],[2341234,11,17,1437]]')
@@ -133,12 +152,18 @@ class ApiTestCase(unittest.TestCase):
 
 
 
+    def test_status(self):
+        response = self.app.post('/status?apikey=YAYTESTS', data=json.dumps(dict(signal_strength=42)))
+        assert response.status_code, 200
+        assert self.get_last_entry(api.app.config['STATUS_TABLE_NAME'])['signal_strength'], 42
+
+
     def test_ping(self):
-        response = self.app.get('/ping')
+        response = self.app.get('/ping?apikey=YAYTESTS')
         assert 'pong' in response.data
 
-    def get_last_entry(self):
-        return api.app.engine.execute(api.get_table().select().order_by(sqlalchemy.desc('id')).limit(1)).fetchone()
+    def get_last_entry(self, table=None):
+        return api.app.engine.execute(api.get_table(table).select().order_by(sqlalchemy.desc('id')).limit(1)).fetchone()
 
 
 if __name__ == '__main__':
