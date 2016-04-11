@@ -9,6 +9,7 @@ import sqlalchemy
 import rollbar
 import rollbar.contrib.flask
 import zlib
+import msgpack
 
 from datetime import datetime, date, timedelta
 from dateutil.parser import parser as date_parser
@@ -90,6 +91,10 @@ def decompress_data():
     if request.headers.get('Content-Encoding', None) == 'gzip':
         request.data = zlib.decompress(request.get_data())
         logging.debug("decompressed %s "%request.data)
+    if request.headers.get('Content-Type', None) == 'application/x-msgpack':
+        request.data = msgpack.unpackb(request.data)
+    if request.headers.get('Content-Type', None) == 'application/json':
+        request.data = json.loads(request.data)
 
 @app.route("/ping")
 def ping():
@@ -128,7 +133,6 @@ def bulk():
 
     data = request.data
     logging.debug("data:%s"%data)
-    data = json.loads(data)
 
     if not data:
         logging.debug("No data recieved dropping")
@@ -171,7 +175,7 @@ def bulk():
 
 @app.route('/status', methods=['GET', 'POST'])
 def status():
-    data = json.loads(request.data)
+    data = request.data
     data['last_contact'] = datetime.now()
     data['rmc'] = g.account['id']
     insert_mysql(data, app.config['STATUS_TABLE_NAME'])
