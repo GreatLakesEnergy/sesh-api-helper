@@ -6,6 +6,7 @@ import tempfile
 import sqlalchemy
 import zlib
 import json
+import msgpack
 
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, DateTime
 from influxdb import client as influxClient
@@ -81,6 +82,11 @@ class ApiTestCase(unittest.TestCase):
     def test_apikey_as_query_param(self):
         assert 200 == self.app.get('/ping?apikey=YAYTESTS').status_code
 
+    #def test_msgpack_content(self):
+
+    #def test_json_content(self):
+
+
     def test_insert(self):
         api.app.config['MAPPING'] = dict(pwr='power')
         r = self.app.get('/input/insert?apikey=YAYTESTS&battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
@@ -103,7 +109,7 @@ class ApiTestCase(unittest.TestCase):
 
     def test_bulk(self):
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
-        r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data='[[121234123,9,16,1137],[2341234,11,17,1437]]')
+        r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data='[[121234123,9,16,1137],[2341234,11,17,1437]]', headers={'Content-Type': 'application/json'})
 
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
@@ -125,7 +131,7 @@ class ApiTestCase(unittest.TestCase):
 
     def test_bulk_compressed(self):
         data_compressed = zlib.compress('[[121234123,9,16,1137],[2341234,11,17,1437]]')
-        headers = {'Content-Encoding': 'gzip'}
+        headers = {'Content-Encoding': 'gzip', 'Content-Type': 'application/json'}
         api.app.config['APIKEY'] = 'testing'
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data=data_compressed, headers=headers)
@@ -151,9 +157,15 @@ class ApiTestCase(unittest.TestCase):
 
 
     def test_status(self):
-        response = self.app.post('/status?apikey=YAYTESTS', data=json.dumps(dict(signal_strength=42)))
+        response = self.app.post('/status?apikey=YAYTESTS', data=json.dumps(dict(signal_strength=42)), headers={'Content-Type': 'application/json'})
         assert response.status_code, 200
-        assert self.get_last_entry(api.app.config['STATUS_TABLE_NAME'])['signal_strength'], 42
+        assert self.get_last_entry(api.app.config['STATUS_TABLE_NAME'])['signal_strength'] == 42
+
+    # I have no idea how to test the before_request... so I just do this integration test and hope the rest works
+    def test_msgpack_for_status(self):
+        response = self.app.post('/status?apikey=YAYTESTS', data=msgpack.packb(dict(signal_strength=42)), headers={'Content-Type': 'application/x-msgpack'})
+        assert response.status_code, 200
+        assert self.get_last_entry(api.app.config['STATUS_TABLE_NAME'])['signal_strength'] == 42
 
 
     def test_ping(self):
