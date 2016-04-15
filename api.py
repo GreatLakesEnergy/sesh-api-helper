@@ -96,6 +96,18 @@ def decompress_data():
     if request.headers.get('Content-Type', None) == 'application/json':
         request.data = json.loads(request.data)
 
+
+@app.before_request
+def insert_last_seen():
+	if 'account' in g:
+		data = dict()
+		data['last_contact'] = datetime.now()
+		data['rmc'] = g.account['id']
+		data['ip_address'] = request.remote_addr
+
+		insert_mysql(data, app.config['STATUS_TABLE_NAME'])
+
+
 @app.route("/ping")
 def ping():
     logging.debug("pong")
@@ -170,15 +182,6 @@ def bulk():
 
         # We need to send the data to the correct table according to the type of data it is
         insert_data(inserts,table)
-
-    return "OK"
-
-@app.route('/status', methods=['GET', 'POST'])
-def status():
-    data = request.data
-    data['last_contact'] = datetime.now()
-    data['rmc'] = g.account['id']
-    insert_mysql(data, app.config['STATUS_TABLE_NAME'])
 
     return "OK"
 

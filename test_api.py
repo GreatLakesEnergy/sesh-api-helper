@@ -19,7 +19,7 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TESTING'] = True
         api.app.config['TABLE_NAME'] = 'test_table'
         api.app.config['TABLE_NAME2'] = 'test_table2'
-        api.app.config['STATUS_TABLE_NAME'] = 'status_table'
+        api.app.config['STATUS_TABLE_NAME'] = 'RMC_Status'
 
         engine = create_engine('sqlite:///', echo=False) # set echo=True for debugging
         metadata = MetaData()
@@ -45,6 +45,7 @@ class ApiTestCase(unittest.TestCase):
         Table(api.app.config['STATUS_TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
             Column('rmc', Integer),
+            Column('ip_address', String),
             Column('last_contact', DateTime),
             Column('signal_strength', Integer)
         )
@@ -72,7 +73,7 @@ class ApiTestCase(unittest.TestCase):
 
 
     def test_apikey_required(self):
-        for route in ['/ping', '/input/insert', '/input/post.json', '/input/bulk', '/status']:
+        for route in ['/ping', '/input/insert', '/input/post.json', '/input/bulk']:
             r = self.app.get(route)
             assert 403 == r.status_code
 
@@ -153,20 +154,6 @@ class ApiTestCase(unittest.TestCase):
         assert len(voltage), 1
         assert api.date_parser().parse(voltage[0]['time'].decode('utf-8')).year == 1970
         #TODO: test timestamp
-
-
-
-    def test_status(self):
-        response = self.app.post('/status?apikey=YAYTESTS', data=json.dumps(dict(signal_strength=42)), headers={'Content-Type': 'application/json'})
-        assert response.status_code, 200
-        assert self.get_last_entry(api.app.config['STATUS_TABLE_NAME'])['signal_strength'] == 42
-
-    # I have no idea how to test the before_request... so I just do this integration test and hope the rest works
-    def test_msgpack_for_status(self):
-        response = self.app.post('/status?apikey=YAYTESTS', data=msgpack.packb(dict(signal_strength=42)), headers={'Content-Type': 'application/x-msgpack'})
-        assert response.status_code, 200
-        assert self.get_last_entry(api.app.config['STATUS_TABLE_NAME'])['signal_strength'] == 42
-
 
     def test_ping(self):
         response = self.app.get('/ping?apikey=YAYTESTS')
