@@ -50,7 +50,7 @@ class ApiTestCase(unittest.TestCase):
             Column('signal_strength', Integer)
         )
 
-        Table('Sesh_RMC_Account', metadata,
+        Table(api.app.config['ACCOUNTS_TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
             Column('API_KEY', String),
         )
@@ -62,7 +62,7 @@ class ApiTestCase(unittest.TestCase):
 
     def setUp(self):
         api.app.config['TESTING'] = True
-        api.app.engine.execute("insert into Sesh_RMC_Account (API_KEY) values ('YAYTESTS')")
+        api.app.engine.execute("insert into " + api.app.config['ACCOUNTS_TABLE_NAME'] + " (API_KEY) values ('YAYTESTS')")
         self.app = api.app.test_client()
         if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
             api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
