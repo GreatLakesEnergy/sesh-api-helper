@@ -118,6 +118,7 @@ def ping():
 @app.route("/input/insert", methods=['GET'])
 def insert():
     args = request.args.copy()
+    args['site_id'] = g.account['id']
     if args.has_key('apikey'): args.pop('apikey')
     insert_data(map_input_to_columns(args))
     return "OK"
@@ -129,6 +130,7 @@ def post():
     if not request.args.get('data', None):
         return ""
     args = request.args.copy()
+    args['site_id'] = g.account['id']
     if args.has_key('apikey'): args.pop('apikey')
 
     data = MultiDict(json.loads(request.args.get('data')))
@@ -150,17 +152,12 @@ def bulk():
         logging.debug("No data recieved dropping")
         return ""
 
-    if not request.args.get('site_id', None):
-        logging.debug("No site_id  recieved dropping")
-        return ""
-
-    site_id =  json.loads(request.args.get('site_id'))
     start_time = datetime.fromtimestamp(int(request.args.get('time')))
     for row in data:
 
         inserts = dict()
         inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
-        inserts['site_id'] = site_id # Adding distinction between sites
+        inserts['site_id'] = g.account['id']
         logging.debug("got post in get "+str(inserts))
         node_id = int(row[1]) # Adding distinction between nodes
         table = None
