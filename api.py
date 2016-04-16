@@ -28,7 +28,8 @@ app.config.update(dict(
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
-    STATUS_TABLE_NAME='RMC_Status',
+    STATUS_TABLE_NAME='seshdash_Sesh_RMC_Status',
+    ACCOUNTS_TABLE_NAME='seshdash_RMC_Account',
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
@@ -77,7 +78,7 @@ def init_rollbar():
 def validate_api_key():
     apikey = request.args.get('apikey', request.headers.get('X-Api-Key', None)) # get the API key from a request param or a header
 
-    sql = get_table('Sesh_RMC_Account').select().where(sqlalchemy.text('API_KEY = :k')).limit(1)
+    sql = get_table(app.config['ACCOUNTS_TABLE_NAME']).select().where(sqlalchemy.text('API_KEY = :k')).limit(1)
     result = app.engine.execute(sql, k=apikey)
     g.account = result.fetchone()
     result.close()
