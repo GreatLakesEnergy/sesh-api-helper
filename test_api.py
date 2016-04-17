@@ -90,22 +90,21 @@ class ApiTestCase(unittest.TestCase):
 
     def test_insert(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/insert?apikey=YAYTESTS&battery_voltage=123&pwr=500&timestamp=2015-12-15T07:36:25Z')
+        r = self.app.get('/input/insert?apikey=YAYTESTS&battery_voltage=123&pwr=78.9&timestamp=2015-12-15T07:36:25Z')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
-        assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'], 123.0
-        assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'], float('78.9')
-
-        assert self.get_last_entry()['power'] == 500
+        assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'] == 123.0
+        assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'] == 78.9
+        assert self.get_last_entry()['power'] == 78.9
 
     def test_post(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/post.json?apikey=YAYTESTS&data={"battery_voltage":123, "pwr":400 ,"timestamp": "2015-12-15T07:36:25Z"}')
+        r = self.app.get('/input/post.json?apikey=YAYTESTS&data={"battery_voltage":123, "pwr": 78.9 ,"timestamp": "2015-12-15T07:36:25Z"}')
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
-        assert self.get_last_entry()['power'] == 400
-        assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'], 123.0
-        assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'], float('78.9')
+        assert self.get_last_entry()['power'] == 78.9
+        assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'] == 123.0
+        assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'] == 78.9
 
 
     def test_bulk(self):
@@ -121,12 +120,13 @@ class ApiTestCase(unittest.TestCase):
         assert rows2[0][3] == 17
 
         power = list(api.influx.query('select value from power').get_points(measurement='power'))
-        assert power[0]['value'], 1437
-        assert power[1]['value'], 1137.42
+        assert power[0]['value'] == 17
+        assert power[1]['value'] == 16
         assert len(power), 2
         voltage = list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))
-        assert voltage[0]['value'], 3164
-        assert len(voltage), 1
+        assert voltage[0]['value'] == 1437
+        assert voltage[1]['value'] == 1137
+        assert len(voltage) == 2
         assert api.date_parser().parse(voltage[0]['time'].decode('utf-8')).year == 1970
         #TODO: test timestamp
 
@@ -146,14 +146,16 @@ class ApiTestCase(unittest.TestCase):
         assert rows2[0][3] == 17
 
         power = list(api.influx.query('select value from power').get_points(measurement='power'))
-        assert power[0]['value'], 1437
-        assert power[1]['value'], 1137.42
-        assert len(power), 2
+        assert power[0]['value'] == 17
+        assert power[1]['value'] == 16
+        assert len(power) == 2
         voltage = list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))
-        assert voltage[0]['value'], 3164
-        assert len(voltage), 1
+        assert voltage[0]['value'] == 1437
+        assert voltage[1]['value'] == 1137
+        assert len(voltage) == 2
         assert api.date_parser().parse(voltage[0]['time'].decode('utf-8')).year == 1970
         #TODO: test timestamp
+
 
     def test_ping(self):
         response = self.app.get('/ping?apikey=YAYTESTS')
