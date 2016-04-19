@@ -34,7 +34,7 @@ app.config.update(dict(
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     BULK_MYSQL_INSERT=False,
-    INFLUXDB_HOST='lcoalhost',
+    INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
