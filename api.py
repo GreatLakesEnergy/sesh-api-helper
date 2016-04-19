@@ -33,6 +33,7 @@ app.config.update(dict(
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
+    BULK_MYSQL_INSERT=False,
     INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
@@ -185,7 +186,7 @@ def bulk():
         logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
-        insert_data(inserts,table,False)
+        insert_data(inserts,table,app.config['BULK_MYSQL_INSERT'])
 
     return "OK"
 
