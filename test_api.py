@@ -137,25 +137,13 @@ class ApiTestCase(unittest.TestCase):
         data_compressed = zlib.compress('[[121234123,9,16,1137],[2341234,11,17,1437]]')
         headers = {'Content-Encoding': 'gzip', 'Content-Type': 'application/json'}
         api.app.config['APIKEY'] = 'testing'
-        api.app.config['BULK_MYSQL_INSERT'] = False
+        api.app.config['BULK_MYSQL_INSERT'] = True
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data=data_compressed, headers=headers)
 
         assert 200 == r.status_code
-        api.app.config['BULK_MYSQL_INSERT'] = False
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
-
-        assert len(rows) == 0
-        assert len(rows2) == 0
-
-        api.app.config['BULK_MYSQL_INSERT'] = True
-        r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data=data_compressed, headers=headers)
-        rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
-        rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
-
-        assert len(rows) == 1
-        assert len(rows2) == 1
 
         assert rows[0][2] == 1137
         assert rows[0][3] == 16

@@ -34,11 +34,11 @@ app.config.update(dict(
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     BULK_MYSQL_INSERT=False,
-    INFLUXDB_HOST='localhost',
+    INFLUXDB_HOST='sesh-dev1.cloudapp.net',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
-    INFLUXDB_DATABASE='kraken'
+    INFLUXDB_DATABASE='kraken-test'
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
@@ -186,7 +186,8 @@ def bulk():
         logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
-        insert_data(inserts,table,app.config['BULK_MYSQL_INSERT'])
+        print "got %s"% app.config['BULK_MYSQL_INSERT']
+        insert_data(inserts, table=table, mysql=app.config['BULK_MYSQL_INSERT'])
 
     return "OK"
 
