@@ -185,7 +185,7 @@ def bulk():
         logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
-        insert_data(inserts,table)
+        insert_data(inserts,table,False)
 
     return "OK"
 
@@ -200,10 +200,11 @@ def map_input_to_columns(args):
 
     return fields
 
-def insert_data(data,table=None):
+def insert_data(data,table=None,mysql=True):
     logging.debug('new input: %s' %(str(data)))
     # Moving to only influx db for data from RMC
-    # insert_mysql(data.copy(),table)
+    if mysql:
+        insert_mysql(data.copy(),table)
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 
