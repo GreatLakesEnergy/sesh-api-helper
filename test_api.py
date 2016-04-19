@@ -149,11 +149,6 @@ class ApiTestCase(unittest.TestCase):
         assert len(rows) == 0
         assert len(rows2) == 0
 
-        assert rows[0][2] == 1137
-        assert rows[0][3] == 16
-        assert rows2[0][2] == 1437
-        assert rows2[0][3] == 17
-
         api.app.config['BULK_MYSQL_INSERT'] = True
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data=data_compressed, headers=headers)
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
