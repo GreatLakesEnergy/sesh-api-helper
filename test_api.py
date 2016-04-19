@@ -20,7 +20,6 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TABLE_NAME'] = 'test_table'
         api.app.config['TABLE_NAME2'] = 'test_table2'
         api.app.config['STATUS_TABLE_NAME'] = 'RMC_Status'
-        api.app.config['BULK_MYSQL_INSERT' ] = False
 
 
         engine = create_engine('sqlite:///', echo=False) # set echo=True for debugging
