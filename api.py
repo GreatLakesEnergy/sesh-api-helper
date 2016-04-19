@@ -108,8 +108,8 @@ def decompress_data():
 def insert_last_seen():
 	if 'account' in g:
 		data = dict()
-		data['last_contact'] = datetime.now()
-		data['rmc'] = g.account['id']
+		data['time'] = datetime.now()
+		data['rmc_id'] = g.account['id']
 		data['ip_address'] = request.remote_addr
 
 		insert_mysql(data, app.config['STATUS_TABLE_NAME'])
