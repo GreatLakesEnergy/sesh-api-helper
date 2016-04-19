@@ -44,9 +44,9 @@ class ApiTestCase(unittest.TestCase):
 
         Table(api.app.config['STATUS_TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
-            Column('rmc', Integer),
+            Column('rmc_id', Integer),
             Column('ip_address', String),
-            Column('last_contact', DateTime),
+            Column('time', DateTime),
             Column('signal_strength', Integer)
         )
 
