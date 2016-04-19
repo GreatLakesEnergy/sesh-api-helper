@@ -34,11 +34,11 @@ app.config.update(dict(
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     BULK_MYSQL_INSERT=False,
-    INFLUXDB_HOST='sesh-dev1.cloudapp.net',
+    INFLUXDB_HOST='lcoalhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
-    INFLUXDB_DATABASE='kraken-test'
+    INFLUXDB_DATABASE='kraken'
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
