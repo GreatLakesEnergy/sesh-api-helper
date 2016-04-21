@@ -128,7 +128,7 @@ def insert():
     args = request.args.copy()
     args['site_id'] = g.account['id']
     if args.has_key('apikey'): args.pop('apikey')
-    insert_data(map_input_to_columns(args))
+    insert_data(map_input_to_columns(args), mysql=app.config['BULK_MYSQL_INSERT'])
     return "OK"
 
 # accepts an EMON post data command
@@ -144,7 +144,7 @@ def post():
     data = MultiDict(json.loads(request.args.get('data')))
     if request.args.get('time', None):
         data['timestamp'] = request.args.get('time')
-    insert_data(map_input_to_columns(data))
+    insert_data(map_input_to_columns(data), mysql=app.config['BULK_MYSQL_INSERT'])
 
     return "OK"
 
@@ -186,7 +186,6 @@ def bulk():
         logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
-        print "got %s"% app.config['BULK_MYSQL_INSERT']
         insert_data(inserts, table=table, mysql=app.config['BULK_MYSQL_INSERT'])
 
     return "OK"
