@@ -33,7 +33,7 @@ app.config.update(dict(
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
-    MYSQL_INSERT=False,
+    MYSQL_INSERT=True,
     INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
