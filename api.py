@@ -28,11 +28,12 @@ app.config.update(dict(
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     TABLE_NAME='seshdash_bom_data_point',
-    STATUS_TABLE_NAME='seshdash_Sesh_RMC_Status',
-    ACCOUNTS_TABLE_NAME='seshdash_RMC_Account',
+    STATUS_TABLE_NAME='seshdash_rmc_status',
+    ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
+    MYSQL_INSERT=True,
     INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
@@ -90,8 +91,14 @@ def validate_api_key():
 def decompress_data():
     # Check if compressesed
     if request.headers.get('Content-Encoding', None) == 'gzip':
-        request.data = zlib.decompress(request.get_data())
-        logging.debug("decompressed %s "%request.data)
+        try:
+            request.data = zlib.decompress(request.get_data())
+            logging.debug("decompressed %s "%request.data)
+        except Exception,e:
+            logging.warning("Unable to decompress dropping data : %s"%e)
+            request.data =  None
+            pass
+
     if request.headers.get('Content-Type', None) == 'application/x-msgpack':
         request.data = msgpack.unpackb(request.data)
     if request.headers.get('Content-Type', None) == 'application/json':
@@ -102,8 +109,8 @@ def decompress_data():
 def insert_last_seen():
 	if 'account' in g:
 		data = dict()
-		data['last_contact'] = datetime.now()
-		data['rmc'] = g.account['id']
+		data['time'] = datetime.now()
+		data['rmc_id'] = g.account['id']
 		data['ip_address'] = request.remote_addr
 
 		insert_mysql(data, app.config['STATUS_TABLE_NAME'])
@@ -121,7 +128,7 @@ def insert():
     args = request.args.copy()
     args['site_id'] = g.account['id']
     if args.has_key('apikey'): args.pop('apikey')
-    insert_data(map_input_to_columns(args))
+    insert_data(map_input_to_columns(args), mysql=app.config['MYSQL_INSERT'])
     return "OK"
 
 # accepts an EMON post data command
@@ -137,7 +144,7 @@ def post():
     data = MultiDict(json.loads(request.args.get('data')))
     if request.args.get('time', None):
         data['timestamp'] = request.args.get('time')
-    insert_data(map_input_to_columns(data))
+    insert_data(map_input_to_columns(data), mysql=app.config['MYSQL_INSERT'])
 
     return "OK"
 
@@ -179,7 +186,7 @@ def bulk():
         logging.debug("inserting %s into table %s"%(inserts,table))
 
         # We need to send the data to the correct table according to the type of data it is
-        insert_data(inserts,table)
+        insert_data(inserts, table=table, mysql=app.config['MYSQL_INSERT'])
 
     return "OK"
 
@@ -194,9 +201,11 @@ def map_input_to_columns(args):
 
     return fields
 
-def insert_data(data,table=None):
+def insert_data(data,table=None,mysql=True):
     logging.debug('new input: %s' %(str(data)))
-    insert_mysql(data.copy(),table)
+    # Moving to only influx db for data from RMC
+    if mysql:
+        insert_mysql(data.copy(),table)
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 

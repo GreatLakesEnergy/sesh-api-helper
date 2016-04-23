@@ -20,6 +20,8 @@ class ApiTestCase(unittest.TestCase):
         api.app.config['TABLE_NAME'] = 'test_table'
         api.app.config['TABLE_NAME2'] = 'test_table2'
         api.app.config['STATUS_TABLE_NAME'] = 'RMC_Status'
+        api.app.config['BULK_MYSQL_INSERT'] = True
+
 
         engine = create_engine('sqlite:///', echo=False) # set echo=True for debugging
         metadata = MetaData()
@@ -44,9 +46,9 @@ class ApiTestCase(unittest.TestCase):
 
         Table(api.app.config['STATUS_TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
-            Column('rmc', Integer),
+            Column('rmc_id', Integer),
             Column('ip_address', String),
-            Column('last_contact', DateTime),
+            Column('time', DateTime),
             Column('signal_strength', Integer)
         )
 
@@ -112,6 +114,7 @@ class ApiTestCase(unittest.TestCase):
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data='[[121234123,9,16,1137],[2341234,11,17,1437]]', headers={'Content-Type': 'application/json'})
 
         assert 200 == r.status_code
+
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         assert rows[0][2] == 1137
@@ -134,16 +137,19 @@ class ApiTestCase(unittest.TestCase):
         data_compressed = zlib.compress('[[121234123,9,16,1137],[2341234,11,17,1437]]')
         headers = {'Content-Encoding': 'gzip', 'Content-Type': 'application/json'}
         api.app.config['APIKEY'] = 'testing'
+        api.app.config['BULK_MYSQL_INSERT'] = True
         api.app.config['BULK_INDEX_MAPPING'] = {9:{2:'power', 3:'battery_voltage','table':'test_table'},11:{2:'power', 3:'battery_voltage','table':'test_table2'}}
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS&time=112312415',data=data_compressed, headers=headers)
 
         assert 200 == r.status_code
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
+
         assert rows[0][2] == 1137
         assert rows[0][3] == 16
         assert rows2[0][2] == 1437
         assert rows2[0][3] == 17
+
 
         power = list(api.influx.query('select value from power').get_points(measurement='power'))
         assert power[0]['value'] == 17
