@@ -93,6 +93,8 @@ def validate_api_key():
 
 @app.before_request
 def decompress_data():
+    if request.data == "":
+        return
     # Check if compressesed
     if request.headers.get('Content-Encoding', None) == 'gzip':
         try:
