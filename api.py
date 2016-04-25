@@ -43,6 +43,10 @@ app.config.update(dict(
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
+# Required if import the app
+if not hasattr(app,'engine)':
+    app.engine = SQLAlchemy(app).engine
+
 if app.config['DEBUG']:
     logging.debug("config: " +str(app.config))
 
