@@ -1,0 +1,21 @@
+{
+  "name": "bower",
+  "homepage": "https://github.com/GreatLakesEnergy/sesh-api-helper",
+  "authors": [
+    "rawjazz <rogerkabeho@gmail.com>"
+  ],
+  "description": "bower_install",
+  "main": "",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "^2.2.3"
+  }
+}

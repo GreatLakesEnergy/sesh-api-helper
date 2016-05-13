@@ -1,0 +1,44 @@
+<! DOCTYPE html >
+   <html>
+       <head>
+           {% block head %}
+           <link rel = "stylesheet" href= "{{url_for('static' ,filename='sesh-helper-ui/css/style.css')}}" /> 
+           <link rel = "stylesheet" href= "{{url_for('static' ,filename='bower_components/bootstrap/dist/css/bootstrap.min.css')}}" />
+           <title>{% block title %}{% endblock%} -Myplayground</title>
+            {% endblock %}
+        </head>
+        <body>
+           <nav class ="navbar navbar-dark bg-primary">
+               <div class="container-fluid">
+                  <div class="navbar-header">
+                      <a class="navbar-brand" href ="#" >Sesh-Api-Helper </a>
+                  </div>
+               </div>
+            </nav>
+
+           <div class = "container row">
+               <div class = "col-md-6">
+                   <div class="panel panel-primary">
+                       <div class ="panel-heading">Success</div>
+                       <div class = "panel-body">
+                          a table will be here
+                       </div>
+                   </div>
+               </div>             
+               <div class = "col-md-6">
+                    <div class = "panel panel-danger">
+                        <div class = "panel-heading"> Fail </div>
+                        <div class = "panel-body">
+                         another table will be here
+                        </div>  
+                    </div>
+                </div> 
+            </div>
+        </body>
+        <script src="{{url_for('static',filename='bower_components/jquery/dist/jquery.min.js')}}" ></script>
+        <script src="{{url_for('static',filename='bower_components/bootstrap/dist/js/bootstrap.min.js')}}"></script>
+      
+</html>
+              
+
+ 

@@ -1,0 +1,15 @@
+
+/*Styling navbar */
+.navbar.navbar-dark.bg-primary{
+border-radius:0;
+}
+.navbar-brand {
+  color:white;
+}
+
+
+/*Styling panels */
+.container.row{
+  margin :auto ;
+}
+ 
