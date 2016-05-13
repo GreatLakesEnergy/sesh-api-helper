@@ -13,15 +13,15 @@ import msgpack
 
 from datetime import datetime, date, timedelta
 from dateutil.parser import parser as date_parser
-from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception, g
+from flask import Flask, abort, request, flash, redirect, render_template, url_for, jsonify, got_request_exception, g ,render_template
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.datastructures import MultiDict
 from influxdb import client as influxClient
-
+from functools import wraps
 
 app = Flask(__name__)
 app.config.update(dict(
-    SQLALCHEMY_DATABASE_URI='sqlite:///kraken.db',
+    SQLALCHEMY_DATABASE_URI='sqlite:///sesh_dash.db',
     DEBUG=True,
     SECRET_KEY='development',
     ROLLBAR_TOKEN=None,
@@ -30,7 +30,7 @@ app.config.update(dict(
     TABLE_NAME='seshdash_bom_data_point',
     STATUS_TABLE_NAME='seshdash_rmc_status',
     ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
-    APIKEY=None,
+    APIKEY='my_key',
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     MYSQL_INSERT=True,
@@ -42,7 +42,22 @@ app.config.update(dict(
 ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
+'''
+#decorator to change endpoints
+def exempt_from_before_request_funcs(func):
+    @wraps(func)
+    def decorated_function(*args ,**kwargs):
+        return func(*args ,**kwargs)
+    return decorated_function
 
+#overidding the before_request_func
+def before_request(func):
+    @wraps(func)
+    def decorated_function(*args ,**kwargs):
+        if func != exempt_from_before_request_funcs():
+           return app.before_request()
+    return decorated_function
+'''
 # Required if import the app
 if not hasattr(app,'engine'):
     app.engine = SQLAlchemy(app).engine
@@ -57,11 +72,13 @@ if 'APIKEY' in app.config:
 if(app.config['INFLUXDB_HOST'] != None):
     influx = influxClient.InfluxDBClient(app.config['INFLUXDB_HOST'], app.config['INFLUXDB_PORT'], app.config['INFLUXDB_USER'], app.config['INFLUXDB_PASSWORD'], app.config['INFLUXDB_DATABASE'])
 
+        
 
 def get_table(table_name=None):
     if table_name:
         return sqlalchemy.schema.Table(table_name, sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
     return sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
+
 
 @app.before_first_request
 def init_rollbar():
@@ -79,7 +96,7 @@ def init_rollbar():
         got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
 
 
-@app.before_request
+#@app.before_request
 def validate_api_key():
     apikey = request.args.get('apikey', request.headers.get('X-Api-Key', None)) # get the API key from a request param or a header
 
@@ -91,7 +108,7 @@ def validate_api_key():
         if g.account == None:
             abort(403)
 
-@app.before_request
+#@app.before_request
 def decompress_data():
     if request.data == "":
         return
@@ -111,7 +128,7 @@ def decompress_data():
         request.data = json.loads(request.data)
 
 
-@app.before_request
+#@app.before_request
 def insert_last_seen():
 	if 'account' in g:
 		data = dict()
@@ -252,12 +269,26 @@ def insert_influx(data):
     influx.write_points(points)
 
 
+@app.route('/admin')
+def admin():
+    return render_template('base.html')
 
+@app.before_request
+def before_request():
+        if 'admin' in request.url:
+            print request.url
+            return admin()
+        else:
+            insert_last_seen()
+            decompress_data()
+            validate_api_key()
+        
 
 if __name__ == "__main__":
-    port = int(os.environ.get('FLASK_PORT', 5000))
+    port = int(os.environ.get('FLASK_PORT', 8080))
     # Use 0.0.0.0 to make server visable externally
-    host = os.environ.get('FLASK_HOST', '')
+    host = os.environ.get('FLASK_HOST', '0.0.0.0')
     app.engine = SQLAlchemy(app).engine
     app.run(host=host,port=port)
+
 
