@@ -30,16 +30,20 @@ app.config.update(dict(
     TABLE_NAME='seshdash_bom_data_point',
     STATUS_TABLE_NAME='seshdash_rmc_status',
     ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
+    SITES_TABLE_NAME='seshdash_sesh_site',
     APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     MYSQL_INSERT=True,
-    INFLUXDB_HOST='localhost',
-    INFLUXDB_PORT=8086,
+    #INFLUXDB_HOST='localhost',
+    INFLUXDB_HOST='192.168.99.100',
+    #INFLUXDB_PORT=8086,
+    INFLUXDB_PORT=32772,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
     INFLUXDB_DATABASE='kraken'
 ))
+
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
@@ -83,13 +87,30 @@ def init_rollbar():
 def validate_api_key():
     apikey = request.args.get('apikey', request.headers.get('X-Api-Key', None)) # get the API key from a request param or a header
 
+    account_table = get_table(app.config['ACCOUNTS_TABLE_NAME'])
+    site_table = get_table(app.config['SITES_TABLE_NAME'])
+
+    # Get RMC account
     sql = get_table(app.config['ACCOUNTS_TABLE_NAME']).select().where(sqlalchemy.text('API_KEY = :k')).limit(1)
     result = app.engine.execute(sql, k=apikey)
+
+    # Store rmc account info
     g.account = result.fetchone()
+
     result.close()
+
     if apikey == None or app.config['APIKEY'] != apikey:
+        # No results returned for API key
         if g.account == None:
             abort(403)
+        else:
+            # Get site name TODO figure out how to do a join
+            sql = site_table.select().where(sqlalchemy.text('id = :k')).limit(1)
+            result = app.engine.execute(sql, k=g.account['site_id'])
+            g.site = result.fetchone()
+            result.close()
+
+
 
 @app.before_request
 def decompress_data():
@@ -109,15 +130,17 @@ def decompress_data():
         request.data = json.loads(request.data)
 
 
-@app.before_request
-def insert_last_seen():
-	if 'account' in g:
-		data = dict()
-		data['time'] = datetime.now()
-		data['rmc_id'] = g.account['id']
-		data['ip_address'] = request.remote_addr
-
-		insert_mysql(data, app.config['STATUS_TABLE_NAME'])
+# Removing this is not usefull this will get calculated from dashboard
+#@app.before_request
+#def insert_last_seen():
+#	if 'account' in g:
+#		data = dict()
+#		data['time'] = datetime.now()
+#		data['site_id'] = g.account['id']
+#		#data['rmc_id'] = g.account['id']
+#		data['ip_address'] = request.remote_addr
+#
+#		insert_mysql(data, app.config['STATUS_TABLE_NAME'])
 
 
 @app.route("/ping")
@@ -130,7 +153,8 @@ def ping():
 @app.route("/input/insert", methods=['GET'])
 def insert():
     args = request.args.copy()
-    args['site_id'] = g.account['id']
+    args['site_id'] = g.account['site_id']
+    args['site_name'] = g.site['site_name']
     if args.has_key('apikey'): args.pop('apikey')
     insert_data(map_input_to_columns(args), mysql=app.config['MYSQL_INSERT'])
     return "OK"
@@ -142,7 +166,9 @@ def post():
     if not request.args.get('data', None):
         return ""
     args = request.args.copy()
-    args['site_id'] = g.account['id']
+    # Attach meta tags
+    args['site_id'] = g.account['site_id']
+    args['site_name'] = g.site['site_name']
     if args.has_key('apikey'): args.pop('apikey')
 
     data = MultiDict(json.loads(request.args.get('data')))
@@ -169,7 +195,8 @@ def bulk():
 
         inserts = dict()
         inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
-        inserts['site_id'] = g.account['id']
+        inserts['site_id'] = g.account['site_id']
+        inserts['site_name'] = g.site['site_name']
         logging.debug("got post in get "+str(inserts))
         node_id = int(row[1]) # Adding distinction between nodes
         table = None
@@ -231,10 +258,12 @@ def insert_influx(data):
     else:
         t = datetime.now()
     timestamp = t.isoformat()
-
     tags = {}
     if data.has_key('site_id'):
         tags["site_id"] = int(data.pop('site_id'))
+    if data.has_key('site_name'):
+        tags["site_name"] = data.pop('site_name')
+
     logging.debug("Prepping data for influx %s"%str(data))
     for key in data:
         point = {
