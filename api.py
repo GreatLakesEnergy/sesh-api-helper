@@ -35,10 +35,8 @@ app.config.update(dict(
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     MYSQL_INSERT=True,
-    #INFLUXDB_HOST='localhost',
-    INFLUXDB_HOST='192.168.99.100',
-    #INFLUXDB_PORT=8086,
-    INFLUXDB_PORT=32772,
+    INFLUXDB_HOST='localhost',
+    INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
     INFLUXDB_DATABASE='kraken'
