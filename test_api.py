@@ -1,5 +1,4 @@
 import unittest
-
 import os
 import api
 import tempfile
@@ -13,6 +12,7 @@ from influxdb import client as influxClient
 
 
 class ApiTestCase(unittest.TestCase):
+
 
     @classmethod
     def setUpClass(cls):
@@ -28,6 +28,7 @@ class ApiTestCase(unittest.TestCase):
 
         Table(api.app.config['TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
+            Column('site_name', String()),
             Column('site_id', Integer),
             Column('battery_voltage', Integer),
             Column('power', Integer),
@@ -38,6 +39,7 @@ class ApiTestCase(unittest.TestCase):
         Table(api.app.config['TABLE_NAME2'], metadata,
             Column('id', Integer, primary_key=True),
             Column('site_id', Integer),
+            Column('site_name', String()),
             Column('battery_voltage', Integer),
             Column('power', Integer),
             Column('timestamp', String()) # ToDo: do real test for time
@@ -53,9 +55,15 @@ class ApiTestCase(unittest.TestCase):
         )
 
         Table(api.app.config['ACCOUNTS_TABLE_NAME'], metadata,
-            Column('id', Integer, primary_key=True),
+            Column('site_id', Integer, primary_key=True),
             Column('API_KEY', String),
         )
+
+        Table(api.app.config['SITES_TABLE_NAME'], metadata,
+            Column('id', Integer, primary_key=True),
+            Column('site_name', String),
+        )
+
 
 
         metadata.create_all(engine)
@@ -65,6 +73,8 @@ class ApiTestCase(unittest.TestCase):
     def setUp(self):
         api.app.config['TESTING'] = True
         api.app.engine.execute("insert into " + api.app.config['ACCOUNTS_TABLE_NAME'] + " (API_KEY) values ('YAYTESTS')")
+        api.app.engine.execute("insert into " + api.app.config['SITES_TABLE_NAME'] + " (site_name) values ('test_site')")
+
         self.app = api.app.test_client()
         if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
             api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
@@ -92,7 +102,7 @@ class ApiTestCase(unittest.TestCase):
 
     def test_insert(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/insert?apikey=YAYTESTS&battery_voltage=123&pwr=78.9&timestamp=2015-12-15T07:36:25Z')
+        r = self.app.get('/input/insert?battery_voltage=123&pwr=78.9&timestamp=2015-12-15T07:36:25Z', headers={'X-API-KEY': 'YAYTESTS'})
         assert 200 == r.status_code
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'] == 123.0
@@ -101,10 +111,12 @@ class ApiTestCase(unittest.TestCase):
 
     def test_post(self):
         api.app.config['MAPPING'] = dict(pwr='power')
-        r = self.app.get('/input/post.json?apikey=YAYTESTS&data={"battery_voltage":123, "pwr": 78.9 ,"timestamp": "2015-12-15T07:36:25Z"}')
+        r = self.app.get('/input/post.json?apikey=YAYTESTS&data={"battery_voltage":123, "pwr": 78.9 ,"timestamp": "2015-12-15T07:36:25Z"}' ,headers={'X-API-KEY': 'YAYTESTS'})
         assert 200 == r.status_code
+
         assert self.get_last_entry()['battery_voltage'] == 123.0
         assert self.get_last_entry()['power'] == 78.9
+
         assert list(api.influx.query('select value from battery_voltage').get_points(measurement='battery_voltage'))[0]['value'] == 123.0
         assert list(api.influx.query('select value from power').get_points(measurement='power'))[0]['value'] == 78.9
 
@@ -117,10 +129,12 @@ class ApiTestCase(unittest.TestCase):
 
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
-        assert rows[0][2] == 1137
-        assert rows[0][3] == 16
-        assert rows2[0][2] == 1437
-        assert rows2[0][3] == 17
+
+
+        assert rows[0][3] == 1137
+        assert rows[0][4] == 16
+        assert rows2[0][3] == 1437
+        assert rows2[0][4] == 17
 
         power = list(api.influx.query('select value from power').get_points(measurement='power'))
         assert power[0]['value'] == 17
@@ -145,10 +159,10 @@ class ApiTestCase(unittest.TestCase):
         rows = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME']).select().order_by(sqlalchemy.desc('id'))).fetchall()
         rows2 = api.app.engine.execute(api.get_table(api.app.config['TABLE_NAME2']).select().order_by(sqlalchemy.desc('id'))).fetchall()
 
-        assert rows[0][2] == 1137
-        assert rows[0][3] == 16
-        assert rows2[0][2] == 1437
-        assert rows2[0][3] == 17
+        assert rows[0][3] == 1137
+        assert rows[0][4] == 16
+        assert rows2[0][3] == 1437
+        assert rows2[0][4] == 17
 
 
         power = list(api.influx.query('select value from power').get_points(measurement='power'))
