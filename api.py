@@ -251,6 +251,8 @@ def insert_mysql(data,table=None):
 
 def insert_influx(data):
     points = []
+    #Add status flag
+    data['status'] = 1
     if data.has_key('timestamp'):
         t = data.pop('timestamp')
         if(type(t) != datetime):
