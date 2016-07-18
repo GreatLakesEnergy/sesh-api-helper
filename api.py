@@ -129,20 +129,6 @@ def decompress_data():
     if request.headers.get('Content-Type', None) == 'application/json':
         request.data = json.loads(request.data)
 
-
-# Removing this is not usefull this will get calculated from dashboard
-#@app.before_request
-#def insert_last_seen():
-#	if 'account' in g:
-#		data = dict()
-#		data['time'] = datetime.now()
-#		data['site_id'] = g.account['id']
-#		#data['rmc_id'] = g.account['id']
-#		data['ip_address'] = request.remote_addr
-#
-#		insert_mysql(data, app.config['STATUS_TABLE_NAME'])
-
-
 @app.route("/ping")
 def ping():
     logging.debug("pong")
@@ -201,23 +187,21 @@ def bulk():
         node_id = int(row[1]) # Adding distinction between nodes
         table = None
 
-        if not app.config['BULK_INDEX_MAPPING'].has_key(node_id):
-            logging.warning("No table mapping found for in BULK_INDEX_MAPPING nodeid=%s dropping"%node_id)
+        if app.config['BULK_INDEX_MAPPING'].has_key(node_id):
 
-            logging.warning(str( app.config['BULK_INDEX_MAPPING'].keys()))
-            logging.warning(str( app.config['BULK_INDEX_MAPPING']))
-            return "NO"
 
-        for index in app.config["BULK_INDEX_MAPPING"][node_id]:
-            if isinstance(index,int) and len(row) >= index+1: # Make sure we have an entry for that index. just in case
-                inserts[app.config['BULK_INDEX_MAPPING'][node_id][index]] = row[index]
+            for index in app.config["BULK_INDEX_MAPPING"][node_id]:
+                if isinstance(index,int) and len(row) >= index+1: # Make sure we have an entry for that index. just in case
+                    inserts[app.config['BULK_INDEX_MAPPING'][node_id][index]] = row[index]
 
-            # Find out which table the data needs to goto
-            table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
-        logging.debug("inserting %s into table %s"%(inserts,table))
+                # Find out which table the data needs to goto
+                table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
+            logging.debug("inserting %s into table %s"%(inserts,table))
 
-        # We need to send the data to the correct table according to the type of data it is
-        insert_data(inserts, table=table, mysql=app.config['MYSQL_INSERT'])
+            # We need to send the data to the correct table according to the type of data it is
+            insert_data(inserts, table=table, mysql=app.config['MYSQL_INSERT'])
+        else:
+            logging.warning("No table mapping found for in BULK_INDEX_MAPPING nodeid=%s skipping"%node_id)
 
     return "OK"
 
