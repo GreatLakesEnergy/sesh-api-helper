@@ -201,7 +201,7 @@ def bulk():
             # We need to send the data to the correct table according to the type of data it is
             insert_data(inserts, table=table, mysql=app.config['MYSQL_INSERT'])
         else:
-            logging.warning("No table mapping found for in BULK_INDEX_MAPPING nodeid=%s skipping"%node_id)
+            logging.error("No table mapping found for in BULK_INDEX_MAPPING nodeid=%s skipping"%node_id)
 
     return "OK"
 
