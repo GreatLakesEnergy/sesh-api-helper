@@ -91,6 +91,13 @@ class ApiTestCase(unittest.TestCase):
             Column('index2', String),
         )
 
+        Table('seshdash_sensor_mapping', metadata, 
+            Column('id', Integer, primary_key=True),
+            Column('site_id', Integer),
+            Column('node_id', Integer),
+            Column('sensor_type', String)
+        )
+
         metadata.create_all(engine)
         api.app.engine = engine
 
@@ -105,6 +112,10 @@ class ApiTestCase(unittest.TestCase):
         api.app.engine.execute("insert into seshdash_sensor_emontx (site_id, node_id, index1, index2) values (1, 11, 'power', 'battery_voltage')" )
         api.app.engine.execute("insert into seshdash_sensor_emonth (site_id, node_id, index1, index2) values (1, 3, 'humidity', 'battery_voltage')" )
 
+        # Addding sensor mapping for each site
+        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 9, 'sensor_bmv')")
+        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 11, 'sensor_emontx')")
+        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 3, 'sensor_emonth')")
 
         self.app = api.app.test_client()
         if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):

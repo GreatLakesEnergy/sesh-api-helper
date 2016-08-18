@@ -35,7 +35,7 @@ app.config.update(dict(
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     MYSQL_INSERT=True,
-    INFLUXDB_HOST='localhost',
+    INFLUXDB_HOST='sesh-dev1.cloudapp.net',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
@@ -207,15 +207,26 @@ def get_associated_sensors(site):
     site
     """
     associated_sensors = []
-    sensor_table_names = ['seshdash_sensor_bmv', 'seshdash_sensor_emontx', 'seshdash_sensor_emonth']
+    site_sensor_mapping = get_sensor_mapping(site)
 
-    for table_name in sensor_table_names:
-        table = get_table(table_name)
-        query = table.select( table.c.site_id == site.id )
-        results = query.execute().fetchall()
-        associated_sensors = associated_sensors  + results
+    for sensor_map in site_sensor_mapping:
+        table = get_table('seshdash_' + sensor_map.sensor_type)
+        query = table.select(sqlalchemy.and_(table.c.site_id == site.id, table.c.node_id==sensor_map.node_id ))
+        sensor = query.execute().fetchall()
+        associated_sensors = associated_sensors  + sensor
 
     return associated_sensors
+
+def get_sensor_mapping(site):
+    """
+    Returns the sensor mappings for a 
+    given site from the seshdash_sensor_mapping table
+    """
+    table_sensor_mapping = get_table('seshdash_sensor_mapping')
+    selector = table_sensor_mapping.select(table_sensor_mapping.c.site_id == site.id)
+    sensor_mapping = selector.execute().fetchall()
+    return sensor_mapping
+
 
 
 def generate_bulk_index_conf(site):
