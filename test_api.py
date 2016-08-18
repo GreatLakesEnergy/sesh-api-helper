@@ -16,7 +16,6 @@ class ApiTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        print "IN setup alll"
         api.app.config['TESTING'] = True
         api.app.config['TABLE_NAME'] = 'test_table'
         api.app.config['TABLE_NAME2'] = 'test_table2'
@@ -97,7 +96,6 @@ class ApiTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        print "In setupp"
         api.app.config['TESTING'] = True
         api.app.engine.execute("insert into " + api.app.config['ACCOUNTS_TABLE_NAME'] + " (API_KEY) values ('YAYTESTS')")
         api.app.engine.execute("insert into " + api.app.config['SITES_TABLE_NAME'] + " (site_name) values ('test_site')")
@@ -109,18 +107,15 @@ class ApiTestCase(unittest.TestCase):
 
 
         self.app = api.app.test_client()
-        print 'Waiting for influx'
         if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
             api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
         api.influx.create_database(api.app.config['INFLUXDB_DATABASE'])
-        print "The end of setup"
 
     def tearDown(self):
         api.get_table().delete()
 
 
     def test_apikey_required(self):
-        print "The first "
         for route in ['/ping', '/input/insert', '/input/post.json', '/input/bulk']:
             r = self.app.get(route)
             assert 403 == r.status_code
@@ -177,7 +172,7 @@ class ApiTestCase(unittest.TestCase):
         data_compressed = zlib.compress('[[121234123,9,16,1137],[2341234,11,17,1437]]')
         headers = {'Content-Encoding': 'gzip', 'Content-Type': 'application/json'}
         api.app.config['BULK_MYSQL_INSERT'] = True
-        
+
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS',data=data_compressed, headers=headers)
         assert 200 == r.status_code
         

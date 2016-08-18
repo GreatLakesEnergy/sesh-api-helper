@@ -35,7 +35,7 @@ app.config.update(dict(
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     MYSQL_INSERT=True,
-    INFLUXDB_HOST='sesh-dev1.cloudapp.net',
+    INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
@@ -53,7 +53,6 @@ if app.config['DEBUG']:
     logging.debug("config: " +str(app.config))
 
 if 'APIKEY' in app.config:
-    print 'Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database'
     logging.warn('Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database')
 
 if(app.config['INFLUXDB_HOST'] != None):
@@ -171,7 +170,6 @@ def bulk():
 
     data = request.data
     logging.debug("data:%s"%data)
-    print "data:%s" % data
 
     if not data:
         logging.debug("No data recieved dropping")
