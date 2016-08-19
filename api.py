@@ -27,19 +27,14 @@ app.config.update(dict(
     ROLLBAR_TOKEN=None,
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
-    TABLE_NAME='seshdash_bom_data_point',
-    STATUS_TABLE_NAME='seshdash_rmc_status',
     ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
+    SENSOR_MAPPING_TABLE='seshdash_sensor_mapping',
     SITES_TABLE_NAME='seshdash_sesh_site',
-    APIKEY=None,
-    MAPPING=dict(),
-    BULK_INDEX_MAPPING = dict(),
-    MYSQL_INSERT=True,
     INFLUXDB_HOST='localhost',
     INFLUXDB_PORT=8086,
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
-    INFLUXDB_DATABASE='kraken'
+    INFLUXDB_DATABASE='kraken-test'
 ))
 
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
@@ -53,7 +48,6 @@ if app.config['DEBUG']:
     logging.debug("config: " +str(app.config))
 
 if 'APIKEY' in app.config:
-    print 'Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database'
     logging.warn('Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database')
 
 if(app.config['INFLUXDB_HOST'] != None):
@@ -63,7 +57,6 @@ if(app.config['INFLUXDB_HOST'] != None):
 def get_table(table_name=None):
     if table_name:
         return sqlalchemy.schema.Table(table_name, sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
-    return sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
 
 @app.before_first_request
 def init_rollbar():
@@ -97,16 +90,16 @@ def validate_api_key():
 
     result.close()
 
-    if apikey == None or app.config['APIKEY'] != apikey:
-        # No results returned for API key
+    if apikey != None:
         if g.account == None:
             abort(403)
         else:
-            # Get site name TODO figure out how to do a join
             sql = site_table.select().where(sqlalchemy.text('id = :k')).limit(1)
             result = app.engine.execute(sql, k=g.account['site_id'])
             g.site = result.fetchone()
             result.close()
+    else:
+        abort(403)
 
 
 
@@ -142,7 +135,7 @@ def insert():
     args['site_id'] = g.account['site_id']
     args['site_name'] = g.site['site_name']
     if args.has_key('apikey'): args.pop('apikey')
-    insert_data(map_input_to_columns(args), mysql=app.config['MYSQL_INSERT'])
+    insert_data(map_input_to_columns(args))
     return "OK"
 
 # accepts an EMON post data command
@@ -160,7 +153,7 @@ def post():
     data = MultiDict(json.loads(request.args.get('data')))
     if request.args.get('time', None):
         data['timestamp'] = request.args.get('time')
-    insert_data(map_input_to_columns(data), mysql=app.config['MYSQL_INSERT'])
+    insert_data(map_input_to_columns(data))
 
     return "OK"
 
@@ -176,34 +169,92 @@ def bulk():
         logging.debug("No data recieved dropping")
         return ""
 
-    start_time = datetime.fromtimestamp(int(request.args.get('time')))
-    for row in data:
-
+    for row in data: 
         inserts = dict()
         inserts['timestamp'] = datetime.fromtimestamp(int(row[0]))
         inserts['site_id'] = g.account['site_id']
         inserts['site_name'] = g.site['site_name']
-        logging.debug("got post in get "+str(inserts))
         node_id = int(row[1]) # Adding distinction between nodes
-        table = None
+        bulk_index_mapping = generate_bulk_index_conf(g.site)
 
-        if app.config['BULK_INDEX_MAPPING'].has_key(node_id):
+        if bulk_index_mapping.has_key(node_id):
+            length_of_indices = len(row)
+            sensor_data = bulk_index_mapping[node_id]
 
+            # Generating an insert dictionary representing the mapping of the data to the sensor mapping(bulk_index_mappng)
+            for index, item_name in sensor_data.items():
+                if length_of_indices > index: # Make sure we have an entry for that index. just in case
+                    inserts[item_name] = row[index]
 
-            for index in app.config["BULK_INDEX_MAPPING"][node_id]:
-                if isinstance(index,int) and len(row) >= index+1: # Make sure we have an entry for that index. just in case
-                    inserts[app.config['BULK_INDEX_MAPPING'][node_id][index]] = row[index]
-
-                # Find out which table the data needs to goto
-                table = app.config['BULK_INDEX_MAPPING'][node_id]['table']
-            logging.debug("inserting %s into table %s"%(inserts,table))
-
-            # We need to send the data to the correct table according to the type of data it is
-            insert_data(inserts, table=table, mysql=app.config['MYSQL_INSERT'])
+            logging.debug("The data to be written to the database is: %s" % inserts)
+            insert_data(inserts)
         else:
-            logging.warning("No table mapping found for in BULK_INDEX_MAPPING nodeid=%s skipping"%node_id)
+            logging.warning("The node_id=%s sent has no mapping for this site. SKIPPING" % node_id)
 
     return "OK"
+
+
+
+def get_associated_sensors(site):
+    """
+    Queryies and returns associated sensors for a given
+    site
+    """
+    associated_sensors = []
+    site_sensor_mapping = get_sensor_mapping(site)
+
+    for sensor_map in site_sensor_mapping:
+        table = get_table('seshdash_' + sensor_map.sensor_type)
+        query = table.select(sqlalchemy.and_(table.c.site_id == site.id, table.c.node_id==sensor_map.node_id ))
+        sensor = query.execute().fetchall()
+        associated_sensors = associated_sensors  + sensor
+
+    return associated_sensors
+
+def get_sensor_mapping(site):
+    """
+    Returns the sensor mappings for a 
+    given site from the SENSOR_MAPPING_TABLE
+    """
+    table_sensor_mapping = get_table(app.config['SENSOR_MAPPING_TABLE'])
+    selector = table_sensor_mapping.select(table_sensor_mapping.c.site_id == site.id)
+    sensor_mapping = selector.execute().fetchall()
+    return sensor_mapping
+
+
+
+def generate_bulk_index_conf(site):
+    """
+    Generates the bulk index configuration
+    for a given site
+    """
+    bulk_index_conf = {}
+    associated_sensors = get_associated_sensors(site)
+
+    for sensor in associated_sensors:
+        bulk_index_conf[sensor.node_id] = generate_sensor_bulk_index_conf(sensor)
+
+    return bulk_index_conf
+
+
+
+def generate_sensor_bulk_index_conf(sensor):
+    """
+    Function to generate the sensor configurations
+    for a given sensor table instance
+    """
+    bulk_index_conf_sensor = {}
+
+    for i in range(1, len(sensor)): 
+        try:
+            bulk_index_conf_sensor[i + 1] = getattr(sensor, 'index' + str(i) )
+        except AttributeError:
+            pass
+
+    return bulk_index_conf_sensor
+
+
+
 
 
 def map_input_to_columns(args):
@@ -216,22 +267,15 @@ def map_input_to_columns(args):
 
     return fields
 
-def insert_data(data,table=None,mysql=True):
+def insert_data(data):
+    """
+    Inserts the data to influx db
+    """
     logging.debug('new input: %s' %(str(data)))
-    # Moving to only influx db for data from RMC
-    if mysql:
-        insert_mysql(data.copy(),table)
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 
-def insert_mysql(data,table=None):
-    if table:
-        table = get_table(table_name = table)
-    else:
-        table = get_table()
-    sql = table.insert().values(data)
-    logging.debug('writing to mysql: %s' %(str(sql)))
-    app.engine.execute(sql).close()
+
 
 def insert_influx(data):
     points = []
