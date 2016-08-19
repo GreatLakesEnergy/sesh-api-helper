@@ -17,8 +17,6 @@ class ApiTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         api.app.config['TESTING'] = True
-        api.app.config['TABLE_NAME'] = 'test_table'
-        api.app.config['TABLE_NAME2'] = 'test_table2'
         api.app.config['STATUS_TABLE_NAME'] = 'RMC_Status'
         api.app.config['BULK_MYSQL_INSERT'] = True
 
@@ -26,25 +24,7 @@ class ApiTestCase(unittest.TestCase):
         engine = create_engine('sqlite:///', echo=False) # set echo=True for debugging
         metadata = MetaData()
 
-        Table(api.app.config['TABLE_NAME'], metadata,
-            Column('id', Integer, primary_key=True),
-            Column('site_name', String()),
-            Column('site_id', Integer),
-            Column('battery_voltage', Integer),
-            Column('power', Integer),
-            Column('timestamp', String()) # ToDo: do real test for time
-            #Column('time', DateTime())
-        )
-
-        Table(api.app.config['TABLE_NAME2'], metadata,
-            Column('id', Integer, primary_key=True),
-            Column('site_id', Integer),
-            Column('site_name', String()),
-            Column('battery_voltage', Integer),
-            Column('power', Integer),
-            Column('timestamp', String()) # ToDo: do real test for time
-            #Column('time', DateTime())
-        )
+        
 
         Table(api.app.config['STATUS_TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
@@ -122,8 +102,6 @@ class ApiTestCase(unittest.TestCase):
             api.influx.drop_database(api.app.config['INFLUXDB_DATABASE'])
         api.influx.create_database(api.app.config['INFLUXDB_DATABASE'])
 
-    def tearDown(self):
-        api.get_table().delete()
 
 
     def test_apikey_required(self):

@@ -27,12 +27,10 @@ app.config.update(dict(
     ROLLBAR_TOKEN=None,
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
-    TABLE_NAME='seshdash_bom_data_point',
     STATUS_TABLE_NAME='seshdash_rmc_status',
     ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
     SENSOR_MAPPING_TABLE='seshdash_sensor_mapping',
     SITES_TABLE_NAME='seshdash_sesh_site',
-    APIKEY=None,
     MAPPING=dict(),
     BULK_INDEX_MAPPING = dict(),
     MYSQL_INSERT=True,
@@ -63,7 +61,6 @@ if(app.config['INFLUXDB_HOST'] != None):
 def get_table(table_name=None):
     if table_name:
         return sqlalchemy.schema.Table(table_name, sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
-    return sqlalchemy.schema.Table(app.config['TABLE_NAME'], sqlalchemy.schema.MetaData(bind=app.engine), autoload=True)
 
 @app.before_first_request
 def init_rollbar():
@@ -97,16 +94,16 @@ def validate_api_key():
 
     result.close()
 
-    if apikey == None or app.config['APIKEY'] != apikey:
-        # No results returned for API key
+    if apikey != None:
         if g.account == None:
             abort(403)
         else:
-            # Get site name TODO figure out how to do a join
             sql = site_table.select().where(sqlalchemy.text('id = :k')).limit(1)
             result = app.engine.execute(sql, k=g.account['site_id'])
             g.site = result.fetchone()
             result.close()
+    else:
+        abort(403)
 
 
 
@@ -252,9 +249,9 @@ def generate_sensor_bulk_index_conf(sensor):
     """
     bulk_index_conf_sensor = {}
 
-    for i in range(1, len(sensor)): # Using this for the maximum rows of a sensor.. Find a way to loop over the sensor rows
+    for i in range(1, len(sensor)): 
         try:
-            bulk_index_conf_sensor[i + 1 ] = getattr(sensor, 'index' + str(i) )
+            bulk_index_conf_sensor[i + 1] = getattr(sensor, 'index' + str(i) )
         except AttributeError:
             pass
 
