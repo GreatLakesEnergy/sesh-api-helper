@@ -30,6 +30,7 @@ app.config.update(dict(
     TABLE_NAME='seshdash_bom_data_point',
     STATUS_TABLE_NAME='seshdash_rmc_status',
     ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
+    SENSOR_MAPPING_TABLE='seshdash_sensor_mapping',
     SITES_TABLE_NAME='seshdash_sesh_site',
     APIKEY=None,
     MAPPING=dict(),
@@ -220,9 +221,9 @@ def get_associated_sensors(site):
 def get_sensor_mapping(site):
     """
     Returns the sensor mappings for a 
-    given site from the seshdash_sensor_mapping table
+    given site from the SENSOR_MAPPING_TABLE
     """
-    table_sensor_mapping = get_table('seshdash_sensor_mapping')
+    table_sensor_mapping = get_table(app.config['SENSOR_MAPPING_TABLE'])
     selector = table_sensor_mapping.select(table_sensor_mapping.c.site_id == site.id)
     sensor_mapping = selector.execute().fetchall()
     return sensor_mapping
