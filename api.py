@@ -1,5 +1,6 @@
 import os
 import logging
+import logging.handlers
 import requests
 import flask
 import datetime
@@ -38,17 +39,25 @@ app.config.update(dict(
 ))
 
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
-logging.basicConfig(level=getattr(logging, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
+
+# Setup Logging
+loghandler = logger.handlers.RotatingFileHandler('logs/' + app.config['ENVIRONMENT'] + '.log','a', 5000 * 1024, 1)
+loghandler.setFormatter(logger.Formatter('%(asctime)s %(levelname)s %(message)s'))
+logger = logger.getLogger("sesh-api")
+logger.addHandler(loghandler)
+logger.setLevel(getattr(logger, app.config['LOG_LEVEL'].upper() ))
+
+#logger.basicConfig(level=getattr(logger, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
 # Required if import the app
 if not hasattr(app,'engine'):
     app.engine = SQLAlchemy(app).engine
 
 if app.config['DEBUG']:
-    logging.debug("config: " +str(app.config))
+    logger.debug("config: " +str(app.config))
 
 if 'APIKEY' in app.config:
-    logging.warn('Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database')
+    logger.warn('Deprecation warning: you have set an APIKEY in your app config. APIKEYS are now managed in the database')
 
 if(app.config['INFLUXDB_HOST'] != None):
     influx = influxClient.InfluxDBClient(app.config['INFLUXDB_HOST'], app.config['INFLUXDB_PORT'], app.config['INFLUXDB_USER'], app.config['INFLUXDB_PASSWORD'], app.config['INFLUXDB_DATABASE'])
@@ -66,9 +75,9 @@ def init_rollbar():
             app.config['ENVIRONMENT'],
             # server root directory, makes tracebacks prettier
             root=os.path.dirname(os.path.realpath(__file__)),
-            # flask already sets up logging
-            allow_logging_basic_config=False)
-        logging.debug("Rollbar intiated")
+            # flask already sets up logger
+            allow_logger_basic_config=False)
+        logger.debug("Rollbar intiated")
 
         # send exceptions from `app` to rollbar, using flask's signal system.
         got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
@@ -111,9 +120,9 @@ def decompress_data():
     if request.headers.get('Content-Encoding', None) == 'gzip':
         try:
             request.data = zlib.decompress(request.get_data())
-            logging.debug("decompressed %s "%request.data)
+            logger.debug("decompressed %s "%request.data)
         except Exception,e:
-            logging.warning("Unable to decompress dropping data : %s"%e)
+            logger.warning("Unable to decompress dropping data : %s"%e)
             request.data =  None
             pass
 
@@ -124,7 +133,7 @@ def decompress_data():
 
 @app.route("/ping")
 def ping():
-    logging.debug("pong")
+    logger.debug("pong")
     return "pong"
 
 
@@ -163,10 +172,10 @@ def post():
 def bulk():
 
     data = request.data
-    logging.debug("data:%s"%data)
+    logger.debug("data:%s"%data)
 
     if not data:
-        logging.debug("No data recieved dropping")
+        logger.debug("No data recieved dropping")
         return ""
 
     for row in data:
@@ -186,10 +195,10 @@ def bulk():
                 if length_of_indices > index: # Make sure we have an entry for that index. just in case
                     inserts[item_name] = row[index]
 
-            logging.debug("The data to be written to the database is: %s" % inserts)
+            logger.debug("The data to be written to the database is: %s" % inserts)
             insert_data(inserts)
         else:
-            logging.warning("The node_id=%s sent has no mapping for this site. SKIPPING" % node_id)
+            logger.warning("The node_id=%s sent has no mapping for this site. SKIPPING" % node_id)
 
     return "OK"
 
@@ -271,7 +280,7 @@ def insert_data(data):
     """
     Inserts the data to influx db
     """
-    logging.debug('new input: %s' %(str(data)))
+    logger.debug('new input: %s' %(str(data)))
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
 
@@ -294,7 +303,7 @@ def insert_influx(data):
     if data.has_key('site_name'):
         tags["site_name"] = data.pop('site_name')
 
-    logging.debug("Prepping data for influx %s"%str(data))
+    logger.debug("Prepping data for influx %s"%str(data))
     for key in data:
         point = {
             "measurement": key,
@@ -305,7 +314,7 @@ def insert_influx(data):
             }
         }
         points.append(point)
-    logging.debug('writing influx points: %s' %(str(points)))
+    logger.debug('writing influx points: %s' %(str(points)))
     influx.write_points(points)
 
 
