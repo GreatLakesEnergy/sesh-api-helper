@@ -41,11 +41,11 @@ app.config.update(dict(
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
 # Setup Logging
-loghandler = logger.handlers.RotatingFileHandler('logs/' + app.config['ENVIRONMENT'] + '.log','a', 5000 * 1024, 1)
-loghandler.setFormatter(logger.Formatter('%(asctime)s %(levelname)s %(message)s'))
-logger = logger.getLogger("sesh-api")
+loghandler = logging.handlers.RotatingFileHandler('logs/' + app.config['ENVIRONMENT'] + '.log','a', 5000 * 1024, 1)
+loghandler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+logger = logging.getLogger("sesh-api")
 logger.addHandler(loghandler)
-logger.setLevel(getattr(logger, app.config['LOG_LEVEL'].upper() ))
+logger.setLevel(getattr(logging, app.config['LOG_LEVEL'].upper() ))
 
 #logger.basicConfig(level=getattr(logger, app.config['LOG_LEVEL'].upper(), None), filename='logs/' + app.config['ENVIRONMENT'] + '.log')
 
