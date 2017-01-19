@@ -24,7 +24,7 @@ class ApiTestCase(unittest.TestCase):
         engine = create_engine('sqlite:///', echo=False) # set echo=True for debugging
         metadata = MetaData()
 
-        
+
 
         Table(api.app.config['STATUS_TABLE_NAME'], metadata,
             Column('id', Integer, primary_key=True),
@@ -44,7 +44,7 @@ class ApiTestCase(unittest.TestCase):
             Column('site_name', String),
         )
 
-        Table('seshdash_sensor_bmv', metadata, 
+        Table('seshdash_sensor_node', metadata,
             Column('id', Integer, primary_key=True),
             Column('site_id', Integer),
             Column('node_id', Integer),
@@ -52,26 +52,7 @@ class ApiTestCase(unittest.TestCase):
             Column('index2', String),
         )
 
-
-        Table('seshdash_sensor_emontx', metadata, 
-            Column('id', Integer, primary_key=True),
-            Column('site_id', Integer),
-            Column('node_id', Integer),
-            Column('index1', String),
-            Column('index2', String),
-        )
-        
-
-
-        Table('seshdash_sensor_emonth', metadata, 
-            Column('id', Integer, primary_key=True),
-            Column('site_id', Integer),
-            Column('node_id', Integer),
-            Column('index1', String),
-            Column('index2', String),
-        )
-
-        Table('seshdash_sensor_mapping', metadata, 
+        Table('seshdash_sensor_mapping', metadata,
             Column('id', Integer, primary_key=True),
             Column('site_id', Integer),
             Column('node_id', Integer),
@@ -88,14 +69,14 @@ class ApiTestCase(unittest.TestCase):
         api.app.engine.execute("insert into " + api.app.config['SITES_TABLE_NAME'] + " (site_name) values ('test_site')")
 
         # Adding sample sensors refferencing to the test site
-        api.app.engine.execute("insert into seshdash_sensor_bmv (site_id, node_id, index1, index2) values (1, 9, 'power', 'battery_voltage')" )
-        api.app.engine.execute("insert into seshdash_sensor_emontx (site_id, node_id, index1, index2) values (1, 11, 'power', 'battery_voltage')" )
-        api.app.engine.execute("insert into seshdash_sensor_emonth (site_id, node_id, index1, index2) values (1, 3, 'humidity', 'battery_voltage')" )
+        api.app.engine.execute("insert into seshdash_sensor_node (site_id, node_id, index1, index2) values (1, 9, 'power', 'battery_voltage')" )
+        api.app.engine.execute("insert into seshdash_sensor_node (site_id, node_id, index1, index2) values (1, 11, 'power', 'battery_voltage')" )
+        api.app.engine.execute("insert into seshdash_sensor_node (site_id, node_id, index1, index2) values (1, 3, 'humidity', 'battery_voltage')" )
 
         # Addding sensor mapping for each site
-        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 9, 'sensor_bmv')")
-        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 11, 'sensor_emontx')")
-        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 3, 'sensor_emonth')")
+        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 9, 'sensor_node')")
+        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 11, 'sensor_node')")
+        api.app.engine.execute("insert into seshdash_sensor_mapping (site_id, node_id, sensor_type) values (1, 3, 'sensor_node')")
 
         self.app = api.app.test_client()
         if({u'name': api.app.config['INFLUXDB_DATABASE']} in api.influx.get_list_database()):
@@ -164,7 +145,7 @@ class ApiTestCase(unittest.TestCase):
 
         r = self.app.post('/input/bulk.json?site_id=1&apikey=YAYTESTS',data=data_compressed, headers=headers)
         assert 200 == r.status_code
-        
+
 
         # Checking if the data mapped and saved correctly
         power = list(api.influx.query('select value from power').get_points(measurement='power'))

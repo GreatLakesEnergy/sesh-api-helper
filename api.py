@@ -29,10 +29,10 @@ app.config.update(dict(
     LOG_LEVEL='DEBUG',
     ENVIRONMENT='development',
     ACCOUNTS_TABLE_NAME='seshdash_sesh_rmc_account',
-    SENSOR_MAPPING_TABLE='seshdash_sensor_mapping',
+    SENSOR_MAPPING_TABLE='seshdash_sensor_node',
     SITES_TABLE_NAME='seshdash_sesh_site',
     INFLUXDB_HOST='localhost',
-    INFLUXDB_PORT=8086,
+    INFLUXDB_PORT='8086',
     INFLUXDB_USER='',
     INFLUXDB_PASSWORD='',
     INFLUXDB_DATABASE='kraken-test'
@@ -109,7 +109,6 @@ def validate_api_key():
             result.close()
     else:
         abort(403)
-
 
 
 @app.before_request
@@ -203,24 +202,25 @@ def bulk():
     return "OK"
 
 
-
 def get_associated_sensors(site):
     """
     Queryies and returns associated sensors for a given
     site
     """
     associated_sensors = []
-    site_sensor_mapping = get_sensor_mapping(site)
+    # Moved all sensors to table sensor_node
+    site_sensor_mapping = get_sensor_mappings(site)
 
     for sensor_map in site_sensor_mapping:
-        table = get_table('seshdash_' + sensor_map.sensor_type)
+        table = get_table((app.config['SENSOR_MAPPING_TABLE']))
         query = table.select(sqlalchemy.and_(table.c.site_id == site.id, table.c.node_id==sensor_map.node_id ))
         sensor = query.execute().fetchall()
         associated_sensors = associated_sensors  + sensor
 
     return associated_sensors
 
-def get_sensor_mapping(site):
+
+def get_sensor_mappings(site):
     """
     Returns the sensor mappings for a
     given site from the SENSOR_MAPPING_TABLE
@@ -229,7 +229,6 @@ def get_sensor_mapping(site):
     selector = table_sensor_mapping.select(table_sensor_mapping.c.site_id == site.id)
     sensor_mapping = selector.execute().fetchall()
     return sensor_mapping
-
 
 
 def generate_bulk_index_conf(site):
@@ -244,7 +243,6 @@ def generate_bulk_index_conf(site):
         bulk_index_conf[sensor.node_id] = generate_sensor_bulk_index_conf(sensor)
 
     return bulk_index_conf
-
 
 
 def generate_sensor_bulk_index_conf(sensor):
@@ -263,9 +261,6 @@ def generate_sensor_bulk_index_conf(sensor):
     return bulk_index_conf_sensor
 
 
-
-
-
 def map_input_to_columns(args):
     fields = dict()
     for key in args:
@@ -276,6 +271,7 @@ def map_input_to_columns(args):
 
     return fields
 
+
 def insert_data(data):
     """
     Inserts the data to influx db
@@ -283,7 +279,6 @@ def insert_data(data):
     logger.debug('new input: %s' %(str(data)))
     if(app.config['INFLUXDB_HOST'] != None):
         insert_influx(data.copy())
-
 
 
 def insert_influx(data):
@@ -316,8 +311,6 @@ def insert_influx(data):
         points.append(point)
     logger.debug('writing influx points: %s' %(str(points)))
     influx.write_points(points)
-
-
 
 
 if __name__ == "__main__":
